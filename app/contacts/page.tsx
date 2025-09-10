@@ -37,10 +37,35 @@ import {
 } from "lucide-react"
 import { ContactProfileDialog } from "@/components/contact-profile-dialog"
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json())
+console.log("[v0] Contacts page loading...")
+
+const fetcher = (url: string) => {
+  console.log("[v0] Fetching from:", url)
+  return fetch(url).then((res) => {
+    console.log("[v0] Response status:", res.status)
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`)
+    }
+    return res.json()
+  })
+}
 
 export default function ContactsPage() {
-  const { data: contacts = [], error, mutate } = useSWR("/api/contacts", fetcher)
+  console.log("[v0] ContactsPage component rendering...")
+
+  const {
+    data: contacts = [],
+    error,
+    mutate,
+  } = useSWR("/api/contacts", fetcher, {
+    onError: (error) => {
+      console.error("[v0] Contacts SWR error:", error)
+    },
+    onSuccess: (data) => {
+      console.log("[v0] Contacts loaded successfully:", data?.length || 0, "items")
+    },
+  })
+
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [sortBy, setSortBy] = useState("name")
@@ -203,11 +228,38 @@ export default function ContactsPage() {
     }
   }
 
-  if (error) return <div>Failed to load contacts</div>
-  if (!contacts) return <div>Loading...</div>
+  if (error) {
+    console.error("[v0] Contacts page error:", error)
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <h2 className="text-lg font-semibold mb-2">Failed to load contacts</h2>
+          <p className="text-muted-foreground mb-4">Error: {error.message || "Unknown error"}</p>
+          <Button onClick={() => mutate()}>Try Again</Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!contacts && !error) {
+    console.log("[v0] Contacts still loading...")
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading contacts...</p>
+        </div>
+      </div>
+    )
+  }
 
   const filteredContacts = Array.isArray(contacts)
     ? contacts.filter((contact: any) => {
+        if (!contact) {
+          console.warn("[v0] Found null/undefined contact:", contact)
+          return false
+        }
+
         const matchesSearch =
           (contact.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
           (contact.company || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -219,6 +271,8 @@ export default function ContactsPage() {
         return matchesSearch && matchesStatus
       })
     : []
+
+  console.log("[v0] Rendering contacts page with", filteredContacts.length, "filtered contacts")
 
   const sortedContacts = sortContacts(filteredContacts)
 

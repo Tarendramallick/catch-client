@@ -109,10 +109,33 @@ const getStageBadgeColor = (stage: string) => {
   }
 }
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json())
+const fetcher = (url: string) => {
+  console.log("[v0] Fetching from:", url)
+  return fetch(url).then((res) => {
+    console.log("[v0] Response status:", res.status)
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`)
+    }
+    return res.json()
+  })
+}
 
 export default function DealsPage() {
-  const { data: deals = [], error, mutate } = useSWR("/api/deals", fetcher)
+  console.log("[v0] DealsPage component rendering...")
+
+  const {
+    data: deals = [],
+    error,
+    mutate,
+  } = useSWR("/api/deals", fetcher, {
+    onError: (error) => {
+      console.error("[v0] Deals SWR error:", error)
+    },
+    onSuccess: (data) => {
+      console.log("[v0] Deals loaded successfully:", data?.length || 0, "items")
+    },
+  })
+
   const [draggedDeal, setDraggedDeal] = useState<string | null>(null)
   const [dragOverStage, setDragOverStage] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
@@ -283,14 +306,18 @@ export default function DealsPage() {
     setDraggedDeal(null)
   }
 
-  if (error) return <div>Failed to load deals</div>
-  if (!deals) return <div>Loading...</div>
-
   const openAddDealDialog = (stage?: string) => {
-    resetForm()
-    if (stage) {
-      setNewDeal((prev) => ({ ...prev, stage }))
-    }
+    setNewDeal({
+      title: "",
+      company: "",
+      industry: "",
+      description: "",
+      value: "",
+      stage: stage || "Lead",
+      probability: "25",
+      closeDate: "",
+      assigneeId: "1",
+    })
     setIsDialogOpen(true)
   }
 
@@ -310,11 +337,44 @@ export default function DealsPage() {
     setIsDialogOpen(true)
   }
 
+  if (error) {
+    console.error("[v0] Deals page error:", error)
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <h2 className="text-lg font-semibold mb-2">Failed to load deals</h2>
+          <p className="text-muted-foreground mb-4">Error: {error.message || "Unknown error"}</p>
+          <Button onClick={() => mutate()}>Try Again</Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!deals && !error) {
+    console.log("[v0] Deals still loading...")
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading deals...</p>
+        </div>
+      </div>
+    )
+  }
+
   const activeDeals = Array.isArray(deals)
-    ? deals.filter((deal) => !["Closed Won", "Closed Lost"].includes(deal.stage))
+    ? deals.filter((deal) => {
+        if (!deal) {
+          console.warn("[v0] Found null/undefined deal:", deal)
+          return false
+        }
+        return !["Closed Won", "Closed Lost"].includes(deal.stage)
+      })
     : []
-  const closedWonDeals = Array.isArray(deals) ? deals.filter((deal) => deal.stage === "Closed Won") : []
-  const closedLostDeals = Array.isArray(deals) ? deals.filter((deal) => deal.stage === "Closed Lost") : []
+
+  const closedWonDeals = Array.isArray(deals) ? deals.filter((deal) => deal && deal.stage === "Closed Won") : []
+
+  const closedLostDeals = Array.isArray(deals) ? deals.filter((deal) => deal && deal.stage === "Closed Lost") : []
 
   const pipelineValue = activeDeals.reduce((sum, deal) => sum + (deal.value || 0), 0)
   const averageDealSize = activeDeals.length > 0 ? pipelineValue / activeDeals.length : 0
@@ -326,11 +386,13 @@ export default function DealsPage() {
 
   const dealsByStage = stages.reduce(
     (acc, stage) => {
-      acc[stage] = Array.isArray(deals) ? deals.filter((deal) => deal.stage === stage) : []
+      acc[stage] = Array.isArray(deals) ? deals.filter((deal) => deal && deal.stage === stage) : []
       return acc
     },
     {} as Record<string, any>,
   )
+
+  console.log("[v0] Rendering deals page with", deals?.length || 0, "total deals")
 
   return (
     <div className="space-y-4 md:space-y-6">

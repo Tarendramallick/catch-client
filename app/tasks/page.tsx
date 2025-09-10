@@ -35,7 +35,18 @@ import {
 } from "lucide-react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json())
+console.log("[v0] Tasks page loading...")
+
+const fetcher = (url: string) => {
+  console.log("[v0] Fetching from:", url)
+  return fetch(url).then((res) => {
+    console.log("[v0] Response status:", res.status)
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`)
+    }
+    return res.json()
+  })
+}
 
 const teamMembers = [
   { id: "1", name: "Sarah Johnson", avatar: "/placeholder.svg?height=32&width=32" },
@@ -90,13 +101,18 @@ const getColumnForTask = (task: any) => {
 }
 
 export default function TasksPage() {
+  console.log("[v0] TasksPage component rendering...")
+
   const {
     data: tasks = [],
     error,
     mutate,
   } = useSWR("/api/tasks", fetcher, {
     onError: (error) => {
-      console.error("[v0] Tasks API error:", error)
+      console.error("[v0] Tasks SWR error:", error)
+    },
+    onSuccess: (data) => {
+      console.log("[v0] Tasks loaded successfully:", data?.length || 0, "items")
     },
   })
 
@@ -281,7 +297,10 @@ export default function TasksPage() {
   // Filter tasks based on search and filters
   const filteredTasks = Array.isArray(tasks)
     ? tasks.filter((task) => {
-        if (!task) return false
+        if (!task) {
+          console.warn("[v0] Found null/undefined task:", task)
+          return false
+        }
 
         const matchesSearch =
           (task.title || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -302,10 +321,38 @@ export default function TasksPage() {
 
   // Group tasks by columns
   const taskColumns = {
-    overdue: filteredTasks.filter((task) => getColumnForTask(task) === "overdue"),
-    today: filteredTasks.filter((task) => getColumnForTask(task) === "today"),
-    thisWeek: filteredTasks.filter((task) => getColumnForTask(task) === "thisWeek"),
-    upcoming: filteredTasks.filter((task) => getColumnForTask(task) === "upcoming"),
+    overdue: filteredTasks.filter((task) => {
+      try {
+        return getColumnForTask(task) === "overdue"
+      } catch (error) {
+        console.error("[v0] Error categorizing task:", task, error)
+        return false
+      }
+    }),
+    today: filteredTasks.filter((task) => {
+      try {
+        return getColumnForTask(task) === "today"
+      } catch (error) {
+        console.error("[v0] Error categorizing task:", task, error)
+        return false
+      }
+    }),
+    thisWeek: filteredTasks.filter((task) => {
+      try {
+        return getColumnForTask(task) === "thisWeek"
+      } catch (error) {
+        console.error("[v0] Error categorizing task:", task, error)
+        return false
+      }
+    }),
+    upcoming: filteredTasks.filter((task) => {
+      try {
+        return getColumnForTask(task) === "upcoming"
+      } catch (error) {
+        console.error("[v0] Error categorizing task:", task, error)
+        return false
+      }
+    }),
     completed: filteredTasks.filter((task) => task.completed),
   }
 
@@ -368,7 +415,7 @@ export default function TasksPage() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <h2 className="text-lg font-semibold mb-2">Failed to load tasks</h2>
-          <p className="text-muted-foreground mb-4">There was an error loading your tasks.</p>
+          <p className="text-muted-foreground mb-4">Error: {error.message || "Unknown error"}</p>
           <Button onClick={() => mutate()}>Try Again</Button>
         </div>
       </div>
@@ -376,6 +423,7 @@ export default function TasksPage() {
   }
 
   if (!tasks && !error) {
+    console.log("[v0] Tasks still loading...")
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -385,6 +433,8 @@ export default function TasksPage() {
       </div>
     )
   }
+
+  console.log("[v0] Rendering tasks page with", filteredTasks.length, "filtered tasks")
 
   return (
     <div className="space-y-4 md:space-y-6">
