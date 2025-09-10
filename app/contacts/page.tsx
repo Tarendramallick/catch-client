@@ -161,16 +161,21 @@ export default function ContactsPage() {
   }
 
   const sortContacts = (contactsToSort: any[]) => {
+    if (!Array.isArray(contactsToSort)) return []
+
     return [...contactsToSort].sort((a, b) => {
       switch (sortBy) {
         case "name":
-          return a.name.localeCompare(b.name)
+          return (a.name || "").localeCompare(b.name || "")
         case "company":
-          return a.company.localeCompare(b.company)
+          return (a.company || "").localeCompare(b.company || "")
         case "status":
-          return a.status.localeCompare(b.status)
+          return (a.status || "").localeCompare(b.status || "")
         case "createdDate":
-          return new Date(b.createdAt || b.createdDate).getTime() - new Date(a.createdAt || a.createdDate).getTime()
+          return (
+            new Date(b.createdAt || b.createdDate || 0).getTime() -
+            new Date(a.createdAt || a.createdDate || 0).getTime()
+          )
         default:
           return 0
       }
@@ -201,17 +206,19 @@ export default function ContactsPage() {
   if (error) return <div>Failed to load contacts</div>
   if (!contacts) return <div>Loading...</div>
 
-  const filteredContacts = contacts.filter((contact: any) => {
-    const matchesSearch =
-      contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.jobTitle.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredContacts = Array.isArray(contacts)
+    ? contacts.filter((contact: any) => {
+        const matchesSearch =
+          (contact.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (contact.company || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (contact.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (contact.jobTitle || "").toLowerCase().includes(searchTerm.toLowerCase())
 
-    const matchesStatus = statusFilter === "all" || contact.status === statusFilter
+        const matchesStatus = statusFilter === "all" || contact.status === statusFilter
 
-    return matchesSearch && matchesStatus
-  })
+        return matchesSearch && matchesStatus
+      })
+    : []
 
   const sortedContacts = sortContacts(filteredContacts)
 
@@ -239,9 +246,11 @@ export default function ContactsPage() {
             <User className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent className="p-0 pt-2">
-            <div className="text-lg md:text-2xl font-bold">{contacts.length}</div>
+            <div className="text-lg md:text-2xl font-bold">{Array.isArray(contacts) ? contacts.length : 0}</div>
             <p className="text-xs text-muted-foreground">
-              <span className="text-green-600">+{contacts.filter((c) => c.status === "Customer").length}</span>{" "}
+              <span className="text-green-600">
+                +{Array.isArray(contacts) ? contacts.filter((c) => c.status === "Customer").length : 0}
+              </span>{" "}
               customers
             </p>
           </CardContent>
@@ -254,7 +263,7 @@ export default function ContactsPage() {
           </CardHeader>
           <CardContent className="p-0 pt-2">
             <div className="text-lg md:text-2xl font-bold">
-              {contacts.filter((c) => c.status === "Hot Lead").length}
+              {Array.isArray(contacts) ? contacts.filter((c) => c.status === "Hot Lead").length : 0}
             </div>
             <p className="text-xs text-muted-foreground">High priority contacts</p>
           </CardContent>
@@ -266,7 +275,9 @@ export default function ContactsPage() {
             <Building2 className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent className="p-0 pt-2">
-            <div className="text-lg md:text-2xl font-bold">{new Set(contacts.map((c) => c.company)).size}</div>
+            <div className="text-lg md:text-2xl font-bold">
+              {Array.isArray(contacts) ? new Set(contacts.map((c) => c.company)).size : 0}
+            </div>
             <p className="text-xs text-muted-foreground">Unique organizations</p>
           </CardContent>
         </Card>
@@ -278,7 +289,10 @@ export default function ContactsPage() {
           </CardHeader>
           <CardContent className="p-0 pt-2">
             <div className="text-lg md:text-2xl font-bold">
-              {contacts.filter((c) => new Date(c.createdDate) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length}
+              {Array.isArray(contacts)
+                ? contacts.filter((c) => new Date(c.createdDate) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
+                    .length
+                : 0}
             </div>
             <p className="text-xs text-muted-foreground">New contacts added</p>
           </CardContent>
@@ -436,12 +450,14 @@ export default function ContactsPage() {
                     </div>
 
                     <div className="mt-2 flex flex-wrap gap-1">
-                      {contact.tags.slice(0, 2).map((tag: string) => (
-                        <Badge key={tag} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                      {contact.tags.length > 2 && (
+                      {Array.isArray(contact.tags)
+                        ? contact.tags.slice(0, 2).map((tag: string) => (
+                            <Badge key={tag} variant="outline" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))
+                        : null}
+                      {Array.isArray(contact.tags) && contact.tags.length > 2 && (
                         <Badge variant="outline" className="text-xs">
                           +{contact.tags.length - 2}
                         </Badge>
@@ -518,12 +534,14 @@ export default function ContactsPage() {
                       </TableCell>
                       <TableCell className="hidden xl:table-cell">
                         <div className="flex flex-wrap gap-1">
-                          {contact.tags.slice(0, 2).map((tag: string) => (
-                            <Badge key={tag} variant="outline" className="text-xs">
-                              {tag}
-                            </Badge>
-                          ))}
-                          {contact.tags.length > 2 && (
+                          {Array.isArray(contact.tags)
+                            ? contact.tags.slice(0, 2).map((tag: string) => (
+                                <Badge key={tag} variant="outline" className="text-xs">
+                                  {tag}
+                                </Badge>
+                              ))
+                            : null}
+                          {Array.isArray(contact.tags) && contact.tags.length > 2 && (
                             <Badge variant="outline" className="text-xs">
                               +{contact.tags.length - 2}
                             </Badge>

@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect } from "react"
-
 import { useState } from "react"
 import useSWR from "swr"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -91,7 +90,16 @@ const getColumnForTask = (task: any) => {
 }
 
 export default function TasksPage() {
-  const { data: tasks = [], error, mutate } = useSWR("/api/tasks", fetcher)
+  const {
+    data: tasks = [],
+    error,
+    mutate,
+  } = useSWR("/api/tasks", fetcher, {
+    onError: (error) => {
+      console.error("[v0] Tasks API error:", error)
+    },
+  })
+
   const [users, setUsers] = useState<any[]>([])
   const [contacts, setContacts] = useState<any[]>([])
   const [companies, setCompanies] = useState<string[]>([])
@@ -115,25 +123,52 @@ export default function TasksPage() {
     client: "",
   })
 
-  // Load data from localStorage
   useEffect(() => {
-    const savedUsers = localStorage.getItem("catchclients-users")
-    const savedContacts = localStorage.getItem("catchclients-contacts")
-    const savedCompanies = localStorage.getItem("catchclients-companies")
+    const loadAdditionalData = async () => {
+      try {
+        // Load users from API
+        const usersResponse = await fetch("/api/users")
+        if (usersResponse.ok) {
+          const usersData = await usersResponse.json()
+          setUsers(usersData)
+        }
 
-    if (savedUsers) setUsers(JSON.parse(savedUsers))
-    if (savedContacts) setContacts(JSON.parse(savedContacts))
+        // Load contacts from API
+        const contactsResponse = await fetch("/api/contacts")
+        if (contactsResponse.ok) {
+          const contactsData = await contactsResponse.json()
+          setContacts(contactsData)
 
-    if (savedCompanies) {
-      const companiesData = JSON.parse(savedCompanies)
-      setCompanies(companiesData.map((c: any) => c.name))
+          // Extract company names from contacts
+          const contactCompanies = contactsData.map((c: any) => c.company).filter(Boolean)
+          setCompanies((prev) => [...new Set([...prev, ...contactCompanies])])
+        }
+
+        // Load companies from API
+        const companiesResponse = await fetch("/api/companies")
+        if (companiesResponse.ok) {
+          const companiesData = await companiesResponse.json()
+          const companyNames = companiesData.map((c: any) => c.name).filter(Boolean)
+          setCompanies((prev) => [...new Set([...prev, ...companyNames])])
+        }
+      } catch (error) {
+        console.error("[v0] Error loading additional data:", error)
+        // Fallback to localStorage if API fails
+        const savedUsers = localStorage.getItem("catchclients-users")
+        const savedContacts = localStorage.getItem("catchclients-contacts")
+        const savedCompanies = localStorage.getItem("catchclients-companies")
+
+        if (savedUsers) setUsers(JSON.parse(savedUsers))
+        if (savedContacts) setContacts(JSON.parse(savedContacts))
+
+        if (savedCompanies) {
+          const companiesData = JSON.parse(savedCompanies)
+          setCompanies(companiesData.map((c: any) => c.name))
+        }
+      }
     }
 
-    if (savedContacts) {
-      const contactsData = JSON.parse(savedContacts)
-      const contactCompanies = contactsData.map((c: any) => c.company)
-      setCompanies((prev) => [...new Set([...prev, ...contactCompanies])])
-    }
+    loadAdditionalData()
   }, [])
 
   const resetForm = () => {
@@ -244,22 +279,26 @@ export default function TasksPage() {
   }
 
   // Filter tasks based on search and filters
-  const filteredTasks = tasks.filter((task) => {
-    const matchesSearch =
-      task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      task.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      task.client.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredTasks = Array.isArray(tasks)
+    ? tasks.filter((task) => {
+        if (!task) return false
 
-    const matchesFilter =
-      filterBy === "all" ||
-      (filterBy === "completed" && task.completed) ||
-      (filterBy === "pending" && !task.completed) ||
-      (filterBy === "high" && task.priority === "high") ||
-      (filterBy === "today" && getColumnForTask(task) === "today") ||
-      (filterBy === "overdue" && getColumnForTask(task) === "overdue")
+        const matchesSearch =
+          (task.title || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (task.description || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (task.client || "").toLowerCase().includes(searchTerm.toLowerCase())
 
-    return matchesSearch && matchesFilter
-  })
+        const matchesFilter =
+          filterBy === "all" ||
+          (filterBy === "completed" && task.completed) ||
+          (filterBy === "pending" && !task.completed) ||
+          (filterBy === "high" && task.priority === "high") ||
+          (filterBy === "today" && getColumnForTask(task) === "today") ||
+          (filterBy === "overdue" && getColumnForTask(task) === "overdue")
+
+        return matchesSearch && matchesFilter
+      })
+    : []
 
   // Group tasks by columns
   const taskColumns = {
@@ -323,8 +362,29 @@ export default function TasksPage() {
     </Card>
   )
 
-  if (error) return <div>Failed to load tasks</div>
-  if (!tasks) return <div>Loading...</div>
+  if (error) {
+    console.error("[v0] Tasks page error:", error)
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <h2 className="text-lg font-semibold mb-2">Failed to load tasks</h2>
+          <p className="text-muted-foreground mb-4">There was an error loading your tasks.</p>
+          <Button onClick={() => mutate()}>Try Again</Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!tasks && !error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading tasks...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4 md:space-y-6">

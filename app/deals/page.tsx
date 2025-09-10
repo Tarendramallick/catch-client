@@ -306,17 +306,19 @@ export default function DealsPage() {
       closeDate: deal.closeDate,
       assigneeId: deal.assigneeId,
     })
-    setEditingDeal(deal.id)
+    setEditingDeal(deal._id)
     setIsDialogOpen(true)
   }
 
-  const activeDeals = deals.filter((deal) => !["Closed Won", "Closed Lost"].includes(deal.stage))
-  const closedWonDeals = deals.filter((deal) => deal.stage === "Closed Won")
-  const closedLostDeals = deals.filter((deal) => deal.stage === "Closed Lost")
+  const activeDeals = Array.isArray(deals)
+    ? deals.filter((deal) => !["Closed Won", "Closed Lost"].includes(deal.stage))
+    : []
+  const closedWonDeals = Array.isArray(deals) ? deals.filter((deal) => deal.stage === "Closed Won") : []
+  const closedLostDeals = Array.isArray(deals) ? deals.filter((deal) => deal.stage === "Closed Lost") : []
 
-  const pipelineValue = activeDeals.reduce((sum, deal) => sum + deal.value, 0)
+  const pipelineValue = activeDeals.reduce((sum, deal) => sum + (deal.value || 0), 0)
   const averageDealSize = activeDeals.length > 0 ? pipelineValue / activeDeals.length : 0
-  const closedWonValue = closedWonDeals.reduce((sum, deal) => sum + deal.value, 0)
+  const closedWonValue = closedWonDeals.reduce((sum, deal) => sum + (deal.value || 0), 0)
   const winRate =
     closedWonDeals.length + closedLostDeals.length > 0
       ? (closedWonDeals.length / (closedWonDeals.length + closedLostDeals.length)) * 100
@@ -324,7 +326,7 @@ export default function DealsPage() {
 
   const dealsByStage = stages.reduce(
     (acc, stage) => {
-      acc[stage] = deals.filter((deal) => deal.stage === stage)
+      acc[stage] = Array.isArray(deals) ? deals.filter((deal) => deal.stage === stage) : []
       return acc
     },
     {} as Record<string, any>,
@@ -458,12 +460,12 @@ export default function DealsPage() {
                     <CardContent className="space-y-3 max-h-96 overflow-y-auto">
                       {dealsByStage[stage]?.map((deal) => (
                         <Card
-                          key={deal.id}
+                          key={deal._id}
                           className={`cursor-move hover:shadow-md transition-all ${
-                            draggedDeal === deal.id ? "opacity-50 rotate-2" : ""
+                            draggedDeal === deal._id ? "opacity-50 rotate-2" : ""
                           }`}
                           draggable
-                          onDragStart={() => handleDragStart(deal.id)}
+                          onDragStart={() => handleDragStart(deal._id)}
                         >
                           <CardContent className="p-3">
                             <div className="flex items-start justify-between mb-2">
@@ -488,15 +490,15 @@ export default function DealsPage() {
                                     <Edit className="mr-2 h-4 w-4" />
                                     Edit Deal
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => closeDealWon(deal.id)}>
+                                  <DropdownMenuItem onClick={() => closeDealWon(deal._id)}>
                                     <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
                                     Close Won
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => closeDealLost(deal.id)}>
+                                  <DropdownMenuItem onClick={() => closeDealLost(deal._id)}>
                                     <XCircle className="mr-2 h-4 w-4 text-red-600" />
                                     Close Lost
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => deleteDeal(deal.id)} className="text-red-600">
+                                  <DropdownMenuItem onClick={() => deleteDeal(deal._id)} className="text-red-600">
                                     <Trash2 className="mr-2 h-4 w-4" />
                                     Delete Deal
                                   </DropdownMenuItem>
@@ -576,12 +578,12 @@ export default function DealsPage() {
                   <CardContent className="space-y-3 max-h-96 overflow-y-auto">
                     {dealsByStage[stage]?.map((deal) => (
                       <Card
-                        key={deal.id}
+                        key={deal._id}
                         className={`cursor-move hover:shadow-md transition-all ${
-                          draggedDeal === deal.id ? "opacity-50 rotate-2" : ""
+                          draggedDeal === deal._id ? "opacity-50 rotate-2" : ""
                         }`}
                         draggable
-                        onDragStart={() => handleDragStart(deal.id)}
+                        onDragStart={() => handleDragStart(deal._id)}
                       >
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between mb-2">
@@ -608,15 +610,15 @@ export default function DealsPage() {
                                     <Edit className="mr-2 h-4 w-4" />
                                     Edit Deal
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => closeDealWon(deal.id)}>
+                                  <DropdownMenuItem onClick={() => closeDealWon(deal._id)}>
                                     <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
                                     Close Won
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => closeDealLost(deal.id)}>
+                                  <DropdownMenuItem onClick={() => closeDealLost(deal._id)}>
                                     <XCircle className="mr-2 h-4 w-4 text-red-600" />
                                     Close Lost
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => deleteDeal(deal.id)} className="text-red-600">
+                                  <DropdownMenuItem onClick={() => deleteDeal(deal._id)} className="text-red-600">
                                     <Trash2 className="mr-2 h-4 w-4" />
                                     Delete Deal
                                   </DropdownMenuItem>
@@ -682,7 +684,7 @@ export default function DealsPage() {
           </CardHeader>
           <CardContent className="space-y-3 max-h-64 overflow-y-auto">
             {dealsByStage["Closed Won"]?.map((deal) => (
-              <Card key={deal.id}>
+              <Card key={deal._id}>
                 <CardContent className="p-3 md:p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
@@ -706,7 +708,7 @@ export default function DealsPage() {
                           <Edit className="mr-2 h-4 w-4" />
                           Edit Deal
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => deleteDeal(deal.id)} className="text-red-600">
+                        <DropdownMenuItem onClick={() => deleteDeal(deal._id)} className="text-red-600">
                           <Trash2 className="mr-2 h-4 w-4" />
                           Delete Deal
                         </DropdownMenuItem>
@@ -748,7 +750,7 @@ export default function DealsPage() {
           </CardHeader>
           <CardContent className="space-y-3 max-h-64 overflow-y-auto">
             {dealsByStage["Closed Lost"]?.map((deal) => (
-              <Card key={deal.id}>
+              <Card key={deal._id}>
                 <CardContent className="p-3 md:p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
@@ -772,7 +774,7 @@ export default function DealsPage() {
                           <Edit className="mr-2 h-4 w-4" />
                           Edit Deal
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => deleteDeal(deal.id)} className="text-red-600">
+                        <DropdownMenuItem onClick={() => deleteDeal(deal._id)} className="text-red-600">
                           <Trash2 className="mr-2 h-4 w-4" />
                           Delete Deal
                         </DropdownMenuItem>
