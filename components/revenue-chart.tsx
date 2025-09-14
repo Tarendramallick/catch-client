@@ -3,78 +3,61 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { useEffect, useState } from "react"
 
-// Generate dynamic revenue data based on deals
-const getDynamicRevenueData = () => {
-  if (typeof window !== "undefined") {
-    const dealsData = localStorage.getItem("catchclients-deals")
-    if (dealsData) {
-      try {
-        const deals = JSON.parse(dealsData)
-        const closedWonDeals = deals.filter((deal: any) => deal.stage === "closed-won")
-
-        // Generate monthly revenue based on closed deals
-        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
-        const currentMonth = new Date().getMonth()
-
-        return months.map((month, index) => {
-          let revenue = 45000 + Math.random() * 20000 // Base revenue
-
-          // Add revenue from closed deals for current and recent months
-          if (index <= currentMonth) {
-            const monthDeals = closedWonDeals.filter((deal: any) => {
-              const dealDate = new Date(deal.lastUpdated || deal.createdDate)
-              return dealDate.getMonth() === index
-            })
-
-            const dealRevenue = monthDeals.reduce((sum: number, deal: any) => sum + deal.value, 0)
-            revenue += dealRevenue
-          }
-
-          return {
-            month,
-            revenue: Math.round(revenue),
-          }
-        })
-      } catch (error) {
-        console.error("Error parsing deals data:", error)
-      }
-    }
-  }
-
-  // Fallback data
-  return [
-    { month: "Jan", revenue: 45000 },
-    { month: "Feb", revenue: 52000 },
-    { month: "Mar", revenue: 48000 },
-    { month: "Apr", revenue: 61000 },
-    { month: "May", revenue: 55000 },
-    { month: "Jun", revenue: 67000 },
-  ]
-}
-
 export function RevenueChart() {
-  const [data, setData] = useState(getDynamicRevenueData())
+  const [data, setData] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const updateData = () => {
-      setData(getDynamicRevenueData())
+    const fetchRevenueData = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch("/api/analytics?metric=revenue")
+        const result = await response.json()
+
+        if (result.success && result.data?.monthly) {
+          setData(result.data.monthly)
+        } else {
+          // Fallback data if API fails
+          setData([
+            { month: "Jan", value: 45000 },
+            { month: "Feb", value: 52000 },
+            { month: "Mar", value: 48000 },
+            { month: "Apr", value: 61000 },
+            { month: "May", value: 55000 },
+            { month: "Jun", value: 67000 },
+          ])
+        }
+      } catch (error) {
+        console.error("Error fetching revenue data:", error)
+        // Fallback data on error
+        setData([
+          { month: "Jan", value: 45000 },
+          { month: "Feb", value: 52000 },
+          { month: "Mar", value: 48000 },
+          { month: "Apr", value: 61000 },
+          { month: "May", value: 55000 },
+          { month: "Jun", value: 67000 },
+        ])
+      } finally {
+        setLoading(false)
+      }
     }
 
-    updateData()
+    fetchRevenueData()
 
-    // Listen for storage changes
-    const handleStorageChange = () => {
-      updateData()
-    }
+    // Refresh data every 30 seconds
+    const interval = setInterval(fetchRevenueData, 30000)
 
-    window.addEventListener("storage", handleStorageChange)
-    const interval = setInterval(updateData, 5000)
-
-    return () => {
-      window.removeEventListener("storage", handleStorageChange)
-      clearInterval(interval)
-    }
+    return () => clearInterval(interval)
   }, [])
+
+  if (loading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="text-sm text-muted-foreground">Loading revenue data...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="w-full h-full">
@@ -100,7 +83,7 @@ export function RevenueChart() {
               borderRadius: "6px",
             }}
           />
-          <Area type="monotone" dataKey="revenue" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
+          <Area type="monotone" dataKey="value" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
         </AreaChart>
       </ResponsiveContainer>
     </div>
