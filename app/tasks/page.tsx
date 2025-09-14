@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import useSWR, { mutate } from "swr"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -33,86 +34,7 @@ import {
 } from "lucide-react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
-const initialTasks = [
-  {
-    id: "t1",
-    title: "Follow up with Acme Corp",
-    description: "Discuss pricing and implementation timeline",
-    type: "call",
-    priority: "high",
-    dueDate: "2024-01-15",
-    dueTime: "2:00 PM",
-    completed: false,
-    assigneeId: "1",
-    assignee: "Sarah Johnson",
-    contactId: "c1",
-    dealId: "d1",
-    client: "Acme Corp",
-    avatar: "/placeholder.svg?height=32&width=32",
-  },
-  {
-    id: "t2",
-    title: "Send proposal to TechStart",
-    description: "Include custom development package details",
-    type: "email",
-    priority: "high",
-    dueDate: "2024-01-15",
-    dueTime: "4:30 PM",
-    completed: false,
-    assigneeId: "2",
-    assignee: "Mike Chen",
-    contactId: "c2",
-    dealId: "d2",
-    client: "TechStart Inc",
-    avatar: "/placeholder.svg?height=32&width=32",
-  },
-  {
-    id: "t3",
-    title: "Demo meeting with Global Solutions",
-    description: "Product demonstration and Q&A session",
-    type: "meeting",
-    priority: "medium",
-    dueDate: "2024-01-16",
-    dueTime: "10:00 AM",
-    completed: false,
-    assigneeId: "3",
-    assignee: "Emma Davis",
-    contactId: "c3",
-    dealId: "d3",
-    client: "Global Solutions",
-    avatar: "/placeholder.svg?height=32&width=32",
-  },
-  {
-    id: "t4",
-    title: "Update CRM records",
-    description: "Add notes from last week's client meetings",
-    type: "task",
-    priority: "low",
-    dueDate: "2024-01-17",
-    dueTime: "End of day",
-    completed: true,
-    assigneeId: "4",
-    assignee: "Alex Rodriguez",
-    client: "Internal",
-    avatar: "/placeholder.svg?height=32&width=32",
-  },
-  {
-    id: "t5",
-    title: "Prepare contract for Acme Corp",
-    description: "Draft contract based on approved proposal",
-    type: "task",
-    priority: "high",
-    dueDate: "2024-01-18",
-    dueTime: "12:00 PM",
-    completed: false,
-    assigneeId: "1",
-    assignee: "Sarah Johnson",
-    contactId: "c1",
-    dealId: "d1",
-    client: "Acme Corp",
-    avatar: "/placeholder.svg?height=32&width=32",
-  },
-]
+const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 const teamMembers = [
   { id: "1", name: "Sarah Johnson", avatar: "/placeholder.svg?height=32&width=32" },
@@ -167,10 +89,11 @@ const getColumnForTask = (task: any) => {
 }
 
 export default function TasksPage() {
-  const [tasks, setTasks] = useState(initialTasks)
-  const [users, setUsers] = useState<any[]>([])
-  const [contacts, setContacts] = useState<any[]>([])
-  const [companies, setCompanies] = useState<string[]>([])
+  const { data: tasks = [], error, isLoading } = useSWR("/api/tasks", fetcher)
+  const { data: users = [] } = useSWR("/api/users", fetcher)
+  const { data: contacts = [] } = useSWR("/api/contacts", fetcher)
+  const { data: companiesData = [] } = useSWR("/api/companies", fetcher)
+
   const [sortBy, setSortBy] = useState("dueDate")
   const [filterBy, setFilterBy] = useState("all")
   const [searchTerm, setSearchTerm] = useState("")
@@ -178,6 +101,8 @@ export default function TasksPage() {
   const [selectedColumn, setSelectedColumn] = useState<string | null>(null)
   const [isCompletedOpen, setIsCompletedOpen] = useState(false)
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
+
+  const [companies, setCompanies] = useState<string[]>([])
 
   // Form state
   const [newTask, setNewTask] = useState({
@@ -191,33 +116,16 @@ export default function TasksPage() {
     client: "",
   })
 
-  // Load data from localStorage
   useEffect(() => {
-    const savedTasks = localStorage.getItem("catchclients-tasks")
-    const savedUsers = localStorage.getItem("catchclients-users")
-    const savedContacts = localStorage.getItem("catchclients-contacts")
-    const savedCompanies = localStorage.getItem("catchclients-companies")
-
-    if (savedTasks) setTasks(JSON.parse(savedTasks))
-    if (savedUsers) setUsers(JSON.parse(savedUsers))
-    if (savedContacts) setContacts(JSON.parse(savedContacts))
-
-    if (savedCompanies) {
-      const companiesData = JSON.parse(savedCompanies)
+    if (companiesData) {
       setCompanies(companiesData.map((c: any) => c.name))
     }
 
-    if (savedContacts) {
-      const contactsData = JSON.parse(savedContacts)
-      const contactCompanies = contactsData.map((c: any) => c.company)
+    if (contacts) {
+      const contactCompanies = contacts.map((c: any) => c.company)
       setCompanies((prev) => [...new Set([...prev, ...contactCompanies])])
     }
-  }, [])
-
-  // Save tasks to localStorage
-  useEffect(() => {
-    localStorage.setItem("catchclients-tasks", JSON.stringify(tasks))
-  }, [tasks])
+  }, [companiesData, contacts])
 
   const resetForm = () => {
     setNewTask({
@@ -255,7 +163,7 @@ export default function TasksPage() {
     setIsDialogOpen(true)
   }
 
-  const handleSaveTask = () => {
+  const handleSaveTask = async () => {
     if (!newTask.title.trim()) {
       alert("Please enter a task title.")
       return
@@ -263,8 +171,7 @@ export default function TasksPage() {
 
     const assignee = [...teamMembers, ...users].find((member) => member.id === newTask.assigneeId)
 
-    const task = {
-      id: `t${Date.now()}`,
+    const taskData = {
       title: newTask.title,
       description: newTask.description,
       type: newTask.type,
@@ -278,22 +185,52 @@ export default function TasksPage() {
       avatar: assignee?.avatar || "/placeholder.svg?height=32&width=32",
     }
 
-    setTasks([task, ...tasks])
-    setIsDialogOpen(false)
-    resetForm()
-  }
+    try {
+      await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(taskData),
+      })
 
-  const toggleTask = (taskId: string) => {
-    setTasks(tasks.map((task) => (task.id === taskId ? { ...task, completed: !task.completed } : task)))
-  }
-
-  const deleteTask = (taskId: string) => {
-    if (confirm("Are you sure you want to delete this task?")) {
-      setTasks(tasks.filter((task) => task.id !== taskId))
+      mutate("/api/tasks")
+      setIsDialogOpen(false)
+      resetForm()
+    } catch (error) {
+      console.error("Error saving task:", error)
+      alert("Failed to save task. Please try again.")
     }
   }
 
-  // Filter tasks based on search and filters
+  const toggleTask = async (taskId: string) => {
+    const task = tasks.find((t: any) => t.id === taskId)
+    if (!task) return
+
+    try {
+      await fetch(`/api/tasks/${taskId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completed: !task.completed }),
+      })
+      mutate("/api/tasks")
+    } catch (error) {
+      console.error("Error updating task:", error)
+    }
+  }
+
+  const deleteTask = async (taskId: string) => {
+    if (confirm("Are you sure you want to delete this task?")) {
+      try {
+        await fetch(`/api/tasks/${taskId}`, {
+          method: "DELETE",
+        })
+        mutate("/api/tasks")
+      } catch (error) {
+        console.error("Error deleting task:", error)
+        alert("Failed to delete task. Please try again.")
+      }
+    }
+  }
+
   const filteredTasks = tasks.filter((task) => {
     const matchesSearch =
       task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -311,7 +248,6 @@ export default function TasksPage() {
     return matchesSearch && matchesFilter
   })
 
-  // Group tasks by columns
   const taskColumns = {
     overdue: filteredTasks.filter((task) => getColumnForTask(task) === "overdue"),
     today: filteredTasks.filter((task) => getColumnForTask(task) === "today"),
@@ -372,6 +308,30 @@ export default function TasksPage() {
       </CardContent>
     </Card>
   )
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading tasks...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Failed to load tasks</p>
+          <button onClick={() => mutate("/api/tasks")} className="text-primary hover:underline">
+            Try again
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -456,36 +416,68 @@ export default function TasksPage() {
           </CardContent>
         </Card>
         <Card className="p-3 md:p-6">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
-            <CardTitle className="text-xs md:text-sm font-medium">Today</CardTitle>
-            <Calendar className="h-3 w-3 md:h-4 md:w-4 text-blue-500" />
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className={`text-base flex items-center gap-2 text-blue-600`}>
+                <Calendar className="h-5 w-5" />
+                <Badge className={`bg-blue-500 text-white`}>{taskColumns.today.length || 0}</Badge>
+                Today
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => openAddTaskDialog("today")}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="p-0 pt-2">
             <div className="text-lg md:text-2xl font-bold text-blue-600">{taskColumns.today.length}</div>
           </CardContent>
         </Card>
         <Card className="p-3 md:p-6">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
-            <CardTitle className="text-xs md:text-sm font-medium">This Week</CardTitle>
-            <Clock className="h-3 w-3 md:h-4 md:w-4 text-yellow-500" />
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className={`text-base flex items-center gap-2 text-yellow-600`}>
+                <Clock className="h-5 w-5" />
+                <Badge className={`bg-yellow-500 text-white`}>{taskColumns.thisWeek.length || 0}</Badge>
+                This Week
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => openAddTaskDialog("thisWeek")}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="p-0 pt-2">
             <div className="text-lg md:text-2xl font-bold text-yellow-600">{taskColumns.thisWeek.length}</div>
           </CardContent>
         </Card>
         <Card className="p-3 md:p-6">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
-            <CardTitle className="text-xs md:text-sm font-medium">Upcoming</CardTitle>
-            <Target className="h-3 w-3 md:h-4 md:w-4 text-green-500" />
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className={`text-base flex items-center gap-2 text-green-600`}>
+                <Target className="h-5 w-5" />
+                <Badge className={`bg-green-500 text-white`}>{taskColumns.upcoming.length || 0}</Badge>
+                Upcoming
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => openAddTaskDialog("upcoming")}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="p-0 pt-2">
             <div className="text-lg md:text-2xl font-bold text-green-600">{taskColumns.upcoming.length}</div>
           </CardContent>
         </Card>
         <Card className="p-3 md:p-6 col-span-2 md:col-span-1">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
-            <CardTitle className="text-xs md:text-sm font-medium">Completed</CardTitle>
-            <CheckCircle className="h-3 w-3 md:h-4 md:w-4 text-purple-500" />
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className={`text-base flex items-center gap-2 text-purple-600`}>
+                <CheckCircle className="h-5 w-5" />
+                <Badge className={`bg-purple-500 text-white`}>{taskColumns.completed.length || 0}</Badge>
+                Completed
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setIsCompletedOpen(!isCompletedOpen)}>
+                {isCompletedOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="p-0 pt-2">
             <div className="text-lg md:text-2xl font-bold text-purple-600">{taskColumns.completed.length}</div>
