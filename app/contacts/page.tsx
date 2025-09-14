@@ -1,7 +1,6 @@
 "use client"
 
-import { useState } from "react"
-import useSWR from "swr"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -34,38 +33,35 @@ import {
   Eye,
   Grid3X3,
   List,
+  Loader2,
 } from "lucide-react"
 import { ContactProfileDialog } from "@/components/contact-profile-dialog"
 
-console.log("[v0] Contacts page loading...")
+const statusOptions = ["Hot Lead", "Qualified", "Cold Lead", "Nurturing", "Customer", "Lost"]
 
-const fetcher = (url: string) => {
-  console.log("[v0] Fetching from:", url)
-  return fetch(url).then((res) => {
-    console.log("[v0] Response status:", res.status)
-    if (!res.ok) {
-      throw new Error(`HTTP error! status: ${res.status}`)
-    }
-    return res.json()
-  })
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case "Hot Lead":
+      return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+    case "Qualified":
+      return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+    case "Cold Lead":
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+    case "Nurturing":
+      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+    case "Customer":
+      return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+    case "Lost":
+      return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+    default:
+      return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+  }
 }
 
 export default function ContactsPage() {
-  console.log("[v0] ContactsPage component rendering...")
-
-  const {
-    data: contacts = [],
-    error,
-    mutate,
-  } = useSWR("/api/contacts", fetcher, {
-    onError: (error) => {
-      console.error("[v0] Contacts SWR error:", error)
-    },
-    onSuccess: (data) => {
-      console.log("[v0] Contacts loaded successfully:", data?.length || 0, "items")
-    },
-  })
-
+  const [contacts, setContacts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [sortBy, setSortBy] = useState("name")
@@ -75,16 +71,39 @@ export default function ContactsPage() {
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [viewMode, setViewMode] = useState<"grid" | "list">("list")
 
+  // Form state
   const [newContact, setNewContact] = useState({
     name: "",
     email: "",
     phone: "",
     company: "",
-    jobTitle: "",
+    position: "",
     status: "Cold Lead",
     website: "",
     tags: "",
   })
+
+  const fetchContacts = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch("/api/contacts")
+      const result = await response.json()
+
+      if (result.success) {
+        setContacts(result.data || [])
+      } else {
+        console.error("Failed to fetch contacts:", result.error)
+      }
+    } catch (error) {
+      console.error("Error fetching contacts:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchContacts()
+  }, [])
 
   const resetForm = () => {
     setNewContact({
@@ -92,7 +111,7 @@ export default function ContactsPage() {
       email: "",
       phone: "",
       company: "",
-      jobTitle: "",
+      position: "",
       status: "Cold Lead",
       website: "",
       tags: "",
@@ -107,16 +126,16 @@ export default function ContactsPage() {
 
   const openEditContactDialog = (contact: any) => {
     setNewContact({
-      name: contact.name,
-      email: contact.email,
-      phone: contact.phone,
-      company: contact.company,
-      jobTitle: contact.jobTitle,
-      status: contact.status,
+      name: contact.name || "",
+      email: contact.email || "",
+      phone: contact.phone || "",
+      company: contact.company || "",
+      position: contact.position || "",
+      status: contact.status || "Cold Lead",
       website: contact.website || "",
-      tags: contact.tags.join(", "),
+      tags: Array.isArray(contact.tags) ? contact.tags.join(", ") : "",
     })
-    setEditingContact(contact._id)
+    setEditingContact(contact.id)
     setIsDialogOpen(true)
   }
 
@@ -141,53 +160,80 @@ export default function ContactsPage() {
       email: newContact.email,
       phone: newContact.phone,
       company: newContact.company,
-      jobTitle: newContact.jobTitle,
+      position: newContact.position,
       status: newContact.status,
       website: newContact.website,
       tags: tags,
     }
 
     try {
+      setSaving(true)
+
       if (editingContact) {
-        await fetch(`/api/contacts/${editingContact}`, {
-          method: "PATCH",
+        // Update existing contact
+        const response = await fetch(`/api/contacts/${editingContact}`, {
+          method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(contactData),
         })
+
+        const result = await response.json()
+        if (result.success) {
+          await fetchContacts() // Refresh the list
+        } else {
+          alert("Failed to update contact: " + result.error)
+          return
+        }
       } else {
-        await fetch("/api/contacts", {
+        // Create new contact
+        const response = await fetch("/api/contacts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(contactData),
         })
+
+        const result = await response.json()
+        if (result.success) {
+          await fetchContacts() // Refresh the list
+        } else {
+          alert("Failed to create contact: " + result.error)
+          return
+        }
       }
 
-      mutate() // Refresh data
       setIsDialogOpen(false)
       resetForm()
     } catch (error) {
       console.error("Error saving contact:", error)
-      alert("Failed to save contact")
+      alert("An error occurred while saving the contact")
+    } finally {
+      setSaving(false)
     }
   }
 
   const deleteContact = async (contactId: string) => {
-    if (confirm("Are you sure you want to delete this contact?")) {
-      try {
-        await fetch(`/api/contacts/${contactId}`, {
-          method: "DELETE",
-        })
-        mutate() // Refresh data
-      } catch (error) {
-        console.error("Error deleting contact:", error)
-        alert("Failed to delete contact")
+    if (!confirm("Are you sure you want to delete this contact?")) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/contacts/${contactId}`, {
+        method: "DELETE",
+      })
+
+      const result = await response.json()
+      if (result.success) {
+        await fetchContacts() // Refresh the list
+      } else {
+        alert("Failed to delete contact: " + result.error)
       }
+    } catch (error) {
+      console.error("Error deleting contact:", error)
+      alert("An error occurred while deleting the contact")
     }
   }
 
   const sortContacts = (contactsToSort: any[]) => {
-    if (!Array.isArray(contactsToSort)) return []
-
     return [...contactsToSort].sort((a, b) => {
       switch (sortBy) {
         case "name":
@@ -197,84 +243,37 @@ export default function ContactsPage() {
         case "status":
           return (a.status || "").localeCompare(b.status || "")
         case "createdDate":
-          return (
-            new Date(b.createdAt || b.createdDate || 0).getTime() -
-            new Date(a.createdAt || a.createdDate || 0).getTime()
-          )
+          return new Date(b.createdDate || 0).getTime() - new Date(a.createdDate || 0).getTime()
         default:
           return 0
       }
     })
   }
 
-  const statusOptions = ["Hot Lead", "Qualified", "Cold Lead", "Nurturing", "Customer", "Lost"]
+  const filteredContacts = contacts.filter((contact) => {
+    const matchesSearch =
+      (contact.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (contact.company || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (contact.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (contact.position || "").toLowerCase().includes(searchTerm.toLowerCase())
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Hot Lead":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-      case "Qualified":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-      case "Cold Lead":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-      case "Nurturing":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-      case "Customer":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
-      case "Lost":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
-    }
-  }
+    const matchesStatus = statusFilter === "all" || contact.status === statusFilter
 
-  if (error) {
-    console.error("[v0] Contacts page error:", error)
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <h2 className="text-lg font-semibold mb-2">Failed to load contacts</h2>
-          <p className="text-muted-foreground mb-4">Error: {error.message || "Unknown error"}</p>
-          <Button onClick={() => mutate()}>Try Again</Button>
-        </div>
-      </div>
-    )
-  }
-
-  if (!contacts && !error) {
-    console.log("[v0] Contacts still loading...")
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading contacts...</p>
-        </div>
-      </div>
-    )
-  }
-
-  const filteredContacts = Array.isArray(contacts)
-    ? contacts.filter((contact: any) => {
-        if (!contact) {
-          console.warn("[v0] Found null/undefined contact:", contact)
-          return false
-        }
-
-        const matchesSearch =
-          (contact.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (contact.company || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (contact.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (contact.jobTitle || "").toLowerCase().includes(searchTerm.toLowerCase())
-
-        const matchesStatus = statusFilter === "all" || contact.status === statusFilter
-
-        return matchesSearch && matchesStatus
-      })
-    : []
-
-  console.log("[v0] Rendering contacts page with", filteredContacts.length, "filtered contacts")
+    return matchesSearch && matchesStatus
+  })
 
   const sortedContacts = sortContacts(filteredContacts)
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading contacts...</span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -300,11 +299,9 @@ export default function ContactsPage() {
             <User className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent className="p-0 pt-2">
-            <div className="text-lg md:text-2xl font-bold">{Array.isArray(contacts) ? contacts.length : 0}</div>
+            <div className="text-lg md:text-2xl font-bold">{contacts.length}</div>
             <p className="text-xs text-muted-foreground">
-              <span className="text-green-600">
-                +{Array.isArray(contacts) ? contacts.filter((c) => c.status === "Customer").length : 0}
-              </span>{" "}
+              <span className="text-green-600">+{contacts.filter((c) => c.status === "Customer").length}</span>{" "}
               customers
             </p>
           </CardContent>
@@ -317,7 +314,7 @@ export default function ContactsPage() {
           </CardHeader>
           <CardContent className="p-0 pt-2">
             <div className="text-lg md:text-2xl font-bold">
-              {Array.isArray(contacts) ? contacts.filter((c) => c.status === "Hot Lead").length : 0}
+              {contacts.filter((c) => c.status === "Hot Lead").length}
             </div>
             <p className="text-xs text-muted-foreground">High priority contacts</p>
           </CardContent>
@@ -330,7 +327,7 @@ export default function ContactsPage() {
           </CardHeader>
           <CardContent className="p-0 pt-2">
             <div className="text-lg md:text-2xl font-bold">
-              {Array.isArray(contacts) ? new Set(contacts.map((c) => c.company)).size : 0}
+              {new Set(contacts.map((c) => c.company).filter(Boolean)).size}
             </div>
             <p className="text-xs text-muted-foreground">Unique organizations</p>
           </CardContent>
@@ -343,10 +340,11 @@ export default function ContactsPage() {
           </CardHeader>
           <CardContent className="p-0 pt-2">
             <div className="text-lg md:text-2xl font-bold">
-              {Array.isArray(contacts)
-                ? contacts.filter((c) => new Date(c.createdDate) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
-                    .length
-                : 0}
+              {
+                contacts.filter(
+                  (c) => c.createdDate && new Date(c.createdDate) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+                ).length
+              }
             </div>
             <p className="text-xs text-muted-foreground">New contacts added</p>
           </CardContent>
@@ -430,16 +428,17 @@ export default function ContactsPage() {
         </CardHeader>
         <CardContent className="p-3 md:p-6">
           {viewMode === "grid" ? (
+            /* Grid View - Mobile Responsive */
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {sortedContacts.map((contact: any) => (
-                <Card key={contact._id} className="hover:shadow-md transition-shadow">
+              {sortedContacts.map((contact) => (
+                <Card key={contact.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center space-x-3">
                         <Avatar className="h-10 w-10">
                           <AvatarImage src={contact.avatar || "/placeholder.svg"} />
                           <AvatarFallback>
-                            {contact.name
+                            {(contact.name || "")
                               .split(" ")
                               .map((n) => n[0])
                               .join("")}
@@ -447,7 +446,7 @@ export default function ContactsPage() {
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <h3 className="font-medium text-sm truncate">{contact.name}</h3>
-                          <p className="text-xs text-muted-foreground truncate">{contact.jobTitle}</p>
+                          <p className="text-xs text-muted-foreground truncate">{contact.position}</p>
                         </div>
                       </div>
                       <DropdownMenu>
@@ -473,7 +472,7 @@ export default function ContactsPage() {
                             <Plus className="mr-2 h-4 w-4" />
                             Create Deal
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => deleteContact(contact._id)} className="text-red-600">
+                          <DropdownMenuItem onClick={() => deleteContact(contact.id)} className="text-red-600">
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete Contact
                           </DropdownMenuItem>
@@ -500,18 +499,18 @@ export default function ContactsPage() {
                       <Badge className={getStatusColor(contact.status)} variant="secondary">
                         {contact.status}
                       </Badge>
-                      <span className="text-xs text-muted-foreground">{contact.lastContact}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {contact.lastContact ? new Date(contact.lastContact).toLocaleDateString() : "No contact yet"}
+                      </span>
                     </div>
 
                     <div className="mt-2 flex flex-wrap gap-1">
-                      {Array.isArray(contact.tags)
-                        ? contact.tags.slice(0, 2).map((tag: string) => (
-                            <Badge key={tag} variant="outline" className="text-xs">
-                              {tag}
-                            </Badge>
-                          ))
-                        : null}
-                      {Array.isArray(contact.tags) && contact.tags.length > 2 && (
+                      {(contact.tags || []).slice(0, 2).map((tag: string) => (
+                        <Badge key={tag} variant="outline" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                      {(contact.tags || []).length > 2 && (
                         <Badge variant="outline" className="text-xs">
                           +{contact.tags.length - 2}
                         </Badge>
@@ -522,6 +521,7 @@ export default function ContactsPage() {
               ))}
             </div>
           ) : (
+            /* List View - Mobile Responsive Table */
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -536,26 +536,27 @@ export default function ContactsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedContacts.map((contact: any) => (
-                    <TableRow key={contact._id}>
+                  {sortedContacts.map((contact) => (
+                    <TableRow key={contact.id}>
                       <TableCell>
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-8 w-8 md:h-10 md:w-10">
                             <AvatarImage src={contact.avatar || "/placeholder.svg"} />
                             <AvatarFallback className="text-xs">
-                              {contact.name
+                              {(contact.name || "")
                                 .split(" ")
-                                .map((n: string) => n[0])
+                                .map((n) => n[0])
                                 .join("")}
                             </AvatarFallback>
                           </Avatar>
                           <div className="min-w-0">
                             <div className="font-medium text-sm">{contact.name}</div>
                             <div className="text-xs text-muted-foreground md:hidden">
-                              {contact.company} • {contact.jobTitle}
+                              {contact.company} • {contact.position}
                             </div>
                             <div className="text-xs text-muted-foreground lg:hidden">
-                              Added {new Date(contact.createdDate).toLocaleDateString()}
+                              Added{" "}
+                              {contact.createdDate ? new Date(contact.createdDate).toLocaleDateString() : "Unknown"}
                             </div>
                           </div>
                         </div>
@@ -566,7 +567,7 @@ export default function ContactsPage() {
                             <Building2 className="h-4 w-4 text-muted-foreground" />
                             <span className="font-medium text-sm">{contact.company}</span>
                           </div>
-                          <div className="text-xs text-muted-foreground">{contact.jobTitle}</div>
+                          <div className="text-xs text-muted-foreground">{contact.position}</div>
                         </div>
                       </TableCell>
                       <TableCell className="hidden lg:table-cell">
@@ -588,14 +589,12 @@ export default function ContactsPage() {
                       </TableCell>
                       <TableCell className="hidden xl:table-cell">
                         <div className="flex flex-wrap gap-1">
-                          {Array.isArray(contact.tags)
-                            ? contact.tags.slice(0, 2).map((tag: string) => (
-                                <Badge key={tag} variant="outline" className="text-xs">
-                                  {tag}
-                                </Badge>
-                              ))
-                            : null}
-                          {Array.isArray(contact.tags) && contact.tags.length > 2 && (
+                          {(contact.tags || []).slice(0, 2).map((tag: string) => (
+                            <Badge key={tag} variant="outline" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
+                          {(contact.tags || []).length > 2 && (
                             <Badge variant="outline" className="text-xs">
                               +{contact.tags.length - 2}
                             </Badge>
@@ -603,7 +602,7 @@ export default function ContactsPage() {
                         </div>
                       </TableCell>
                       <TableCell className="hidden sm:table-cell text-xs text-muted-foreground">
-                        {contact.lastContact}
+                        {contact.lastContact ? new Date(contact.lastContact).toLocaleDateString() : "No contact yet"}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
@@ -629,7 +628,7 @@ export default function ContactsPage() {
                               <Plus className="mr-2 h-4 w-4" />
                               Create Deal
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => deleteContact(contact._id)} className="text-red-600">
+                            <DropdownMenuItem onClick={() => deleteContact(contact.id)} className="text-red-600">
                               <Trash2 className="mr-2 h-4 w-4" />
                               Delete Contact
                             </DropdownMenuItem>
@@ -677,11 +676,11 @@ export default function ContactsPage() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="jobTitle">Job Title</Label>
+              <Label htmlFor="position">Job Title</Label>
               <Input
-                id="jobTitle"
-                value={newContact.jobTitle}
-                onChange={(e) => setNewContact({ ...newContact, jobTitle: e.target.value })}
+                id="position"
+                value={newContact.position}
+                onChange={(e) => setNewContact({ ...newContact, position: e.target.value })}
                 placeholder="Enter job title or position"
               />
             </div>
@@ -749,12 +748,24 @@ export default function ContactsPage() {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button onClick={handleSaveContact} className="w-full sm:w-auto">
-              {editingContact ? "Update Contact" : "Add Person"}
+            <Button onClick={handleSaveContact} disabled={saving} className="w-full sm:w-auto">
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {editingContact ? "Updating..." : "Adding..."}
+                </>
+              ) : editingContact ? (
+                "Update Contact"
+              ) : (
+                "Add Person"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Contact Profile Dialog */}
+      <ContactProfileDialog contact={selectedContact} isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
     </div>
   )
 }
