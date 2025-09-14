@@ -1,7 +1,8 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import useSWR, { mutate } from "swr"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -68,131 +69,12 @@ const teamMembers = [
   { id: "4", name: "Alex Rodriguez", avatar: "/placeholder.svg?height=32&width=32" },
 ]
 
-const initialDeals = [
-  {
-    id: "d1",
-    title: "Enterprise Package",
-    company: "Acme Corp",
-    industry: "Technology",
-    description: "Enterprise software solution for 500+ employees with advanced analytics and reporting features",
-    value: 45000,
-    stage: "Proposal",
-    probability: 75,
-    closeDate: "2024-02-15",
-    assigneeId: "1",
-    assignee: "Sarah Johnson",
-    avatar: "/placeholder.svg?height=32&width=32",
-    lastUpdated: "2024-01-15",
-    createdDate: "2024-01-10",
-  },
-  {
-    id: "d2",
-    title: "Startup Plan",
-    company: "TechStart Inc",
-    industry: "Technology",
-    description: "Custom development and consulting services for growing startup",
-    value: 28500,
-    stage: "Negotiation",
-    probability: 90,
-    closeDate: "2024-02-10",
-    assigneeId: "2",
-    assignee: "Mike Chen",
-    avatar: "/placeholder.svg?height=32&width=32",
-    lastUpdated: "2024-01-14",
-    createdDate: "2024-01-08",
-  },
-  {
-    id: "d3",
-    title: "Integration Project",
-    company: "Global Solutions",
-    industry: "Consulting",
-    description: "System integration and migration project for multinational consulting firm",
-    value: 67200,
-    stage: "Qualified",
-    probability: 60,
-    closeDate: "2024-03-01",
-    assigneeId: "3",
-    assignee: "Emma Davis",
-    avatar: "/placeholder.svg?height=32&width=32",
-    lastUpdated: "2024-01-13",
-    createdDate: "2024-01-05",
-  },
-  {
-    id: "d4",
-    title: "Healthcare Solution",
-    company: "Innovation Labs",
-    industry: "Healthcare",
-    description: "Medical technology integration with compliance and security features",
-    value: 89000,
-    stage: "Lead",
-    probability: 25,
-    closeDate: "2024-03-15",
-    assigneeId: "4",
-    assignee: "Alex Rodriguez",
-    avatar: "/placeholder.svg?height=32&width=32",
-    lastUpdated: "2024-01-12",
-    createdDate: "2024-01-12",
-  },
-  {
-    id: "d5",
-    title: "E-commerce Platform",
-    company: "Future Systems",
-    industry: "Retail",
-    description: "Complete e-commerce platform with inventory management and analytics",
-    value: 125000,
-    stage: "Closed Won",
-    probability: 100,
-    closeDate: "2024-01-20",
-    assigneeId: "1",
-    assignee: "Sarah Johnson",
-    avatar: "/placeholder.svg?height=32&width=32",
-    lastUpdated: "2024-01-20",
-    createdDate: "2023-12-15",
-  },
-]
-
-const stages = ["Lead", "Qualified", "Proposal", "Negotiation", "Closed Won", "Closed Lost"]
-
-const getStageColor = (stage: string) => {
-  switch (stage) {
-    case "Lead":
-      return "bg-gray-100 border-gray-200 dark:bg-gray-800 dark:border-gray-700"
-    case "Qualified":
-      return "bg-blue-100 border-blue-200 dark:bg-blue-900 dark:border-blue-700"
-    case "Proposal":
-      return "bg-yellow-100 border-yellow-200 dark:bg-yellow-900 dark:border-yellow-700"
-    case "Negotiation":
-      return "bg-orange-100 border-orange-200 dark:bg-orange-900 dark:border-orange-700"
-    case "Closed Won":
-      return "bg-green-100 border-green-200 dark:bg-green-900 dark:border-green-700"
-    case "Closed Lost":
-      return "bg-red-100 border-red-200 dark:bg-red-900 dark:border-red-700"
-    default:
-      return "bg-gray-100 border-gray-200 dark:bg-gray-800 dark:border-gray-700"
-  }
-}
-
-const getStageBadgeColor = (stage: string) => {
-  switch (stage) {
-    case "Lead":
-      return "bg-gray-500"
-    case "Qualified":
-      return "bg-blue-500"
-    case "Proposal":
-      return "bg-yellow-500"
-    case "Negotiation":
-      return "bg-orange-500"
-    case "Closed Won":
-      return "bg-green-500"
-    case "Closed Lost":
-      return "bg-red-500"
-    default:
-      return "bg-gray-500"
-  }
-}
+const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 export default function DealsPage() {
-  const [deals, setDeals] = useState(initialDeals)
+  const { data: deals = [], error, isLoading } = useSWR("/api/deals", fetcher)
+  const { data: users = [] } = useSWR("/api/users", fetcher)
+
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingDeal, setEditingDeal] = useState<string | null>(null)
   const [draggedDeal, setDraggedDeal] = useState<string | null>(null)
@@ -212,20 +94,6 @@ export default function DealsPage() {
     assigneeId: "1",
   })
 
-  // Load deals from localStorage on mount
-  useEffect(() => {
-    const savedDeals = localStorage.getItem("catchclients-deals")
-    if (savedDeals) {
-      setDeals(JSON.parse(savedDeals))
-    }
-  }, [])
-
-  // Save deals to localStorage whenever deals change
-  useEffect(() => {
-    localStorage.setItem("catchclients-deals", JSON.stringify(deals))
-    window.dispatchEvent(new Event("storage"))
-  }, [deals])
-
   const resetForm = () => {
     setNewDeal({
       title: "",
@@ -241,15 +109,7 @@ export default function DealsPage() {
     setEditingDeal(null)
   }
 
-  const openAddDealDialog = (stage?: string) => {
-    resetForm()
-    if (stage) {
-      setNewDeal((prev) => ({ ...prev, stage }))
-    }
-    setIsDialogOpen(true)
-  }
-
-  const openEditDealDialog = (deal: (typeof initialDeals)[0]) => {
+  const openEditDialog = (deal: any) => {
     setNewDeal({
       title: deal.title,
       company: deal.company,
@@ -265,98 +125,119 @@ export default function DealsPage() {
     setIsDialogOpen(true)
   }
 
-  const handleSaveDeal = () => {
+  const handleSaveDeal = async () => {
     if (!newDeal.title.trim() || !newDeal.company.trim() || !newDeal.value.trim()) {
       alert("Please fill in the title, company, and value fields.")
       return
     }
 
-    const assignee = teamMembers.find((member) => member.id === newDeal.assigneeId)
+    const assignee = [...teamMembers, ...users].find((member) => member.id === newDeal.assigneeId)
 
-    if (editingDeal) {
-      setDeals(
-        deals.map((deal) =>
-          deal.id === editingDeal
-            ? {
-                ...deal,
-                title: newDeal.title,
-                company: newDeal.company,
-                industry: newDeal.industry,
-                description: newDeal.description,
-                value: Number.parseInt(newDeal.value),
-                stage: newDeal.stage,
-                probability: Number.parseInt(newDeal.probability),
-                closeDate: newDeal.closeDate,
-                assigneeId: newDeal.assigneeId,
-                assignee: assignee?.name || "Unknown",
-                avatar: assignee?.avatar || "/placeholder.svg?height=32&width=32",
-                lastUpdated: new Date().toISOString().split("T")[0],
-              }
-            : deal,
-        ),
-      )
-    } else {
-      const deal = {
-        id: `d${Date.now()}`,
-        title: newDeal.title,
-        company: newDeal.company,
-        industry: newDeal.industry,
-        description: newDeal.description,
-        value: Number.parseInt(newDeal.value),
-        stage: newDeal.stage,
-        probability: Number.parseInt(newDeal.probability),
-        closeDate: newDeal.closeDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-        assigneeId: newDeal.assigneeId,
-        assignee: assignee?.name || "Unknown",
-        avatar: assignee?.avatar || "/placeholder.svg?height=32&width=32",
-        lastUpdated: new Date().toISOString().split("T")[0],
-        createdDate: new Date().toISOString().split("T")[0],
+    const dealData = {
+      title: newDeal.title,
+      company: newDeal.company,
+      industry: newDeal.industry,
+      description: newDeal.description,
+      value: Number.parseInt(newDeal.value),
+      stage: newDeal.stage,
+      probability: Number.parseInt(newDeal.probability),
+      closeDate: newDeal.closeDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+      assigneeId: newDeal.assigneeId,
+      assignee: assignee?.name || "Unknown",
+      avatar: assignee?.avatar || "/placeholder.svg?height=32&width=32",
+    }
+
+    try {
+      if (editingDeal) {
+        // Update existing deal
+        await fetch(`/api/deals/${editingDeal}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(dealData),
+        })
+      } else {
+        // Create new deal
+        await fetch("/api/deals", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(dealData),
+        })
       }
 
-      setDeals([deal, ...deals])
+      // Refresh the deals data
+      mutate("/api/deals")
+      setIsDialogOpen(false)
+      resetForm()
+    } catch (error) {
+      console.error("Error saving deal:", error)
+      alert("Failed to save deal. Please try again.")
     }
-
-    setIsDialogOpen(false)
-    resetForm()
   }
 
-  const deleteDeal = (dealId: string) => {
+  const deleteDeal = async (dealId: string) => {
     if (confirm("Are you sure you want to delete this deal?")) {
-      setDeals(deals.filter((deal) => deal.id !== dealId))
+      try {
+        await fetch(`/api/deals/${dealId}`, {
+          method: "DELETE",
+        })
+        mutate("/api/deals")
+      } catch (error) {
+        console.error("Error deleting deal:", error)
+        alert("Failed to delete deal. Please try again.")
+      }
     }
   }
 
-  const closeDealWon = (dealId: string) => {
-    if (confirm("Mark this deal as Closed Won?")) {
-      setDeals(
-        deals.map((deal) =>
-          deal.id === dealId
-            ? {
-                ...deal,
-                stage: "Closed Won",
-                probability: 100,
-                lastUpdated: new Date().toISOString().split("T")[0],
-              }
-            : deal,
-        ),
-      )
+  const updateDealStage = async (dealId: string, newStage: string) => {
+    try {
+      await fetch(`/api/deals/${dealId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage: newStage }),
+      })
+      mutate("/api/deals")
+    } catch (error) {
+      console.error("Error updating deal stage:", error)
     }
   }
 
-  const closeDealLost = (dealId: string) => {
-    if (confirm("Mark this deal as Closed Lost?")) {
-      setDeals(
-        deals.map((deal) =>
-          deal.id === dealId
-            ? {
-                ...deal,
-                stage: "Closed Lost",
-                probability: 0,
-                lastUpdated: new Date().toISOString().split("T")[0],
-              }
-            : deal,
-        ),
-      )
+  const stages = ["Lead", "Qualified", "Proposal", "Negotiation", "Closed Won", "Closed Lost"]
+
+  const getStageColor = (stage: string) => {
+    switch (stage) {
+      case "Lead":
+        return "bg-gray-100 border-gray-200 dark:bg-gray-800 dark:border-gray-700"
+      case "Qualified":
+        return "bg-blue-100 border-blue-200 dark:bg-blue-900 dark:border-blue-700"
+      case "Proposal":
+        return "bg-yellow-100 border-yellow-200 dark:bg-yellow-900 dark:border-yellow-700"
+      case "Negotiation":
+        return "bg-orange-100 border-orange-200 dark:bg-orange-900 dark:border-orange-700"
+      case "Closed Won":
+        return "bg-green-100 border-green-200 dark:bg-green-900 dark:border-green-700"
+      case "Closed Lost":
+        return "bg-red-100 border-red-200 dark:bg-red-900 dark:border-red-700"
+      default:
+        return "bg-gray-100 border-gray-200 dark:bg-gray-800 dark:border-gray-700"
+    }
+  }
+
+  const getStageBadgeColor = (stage: string) => {
+    switch (stage) {
+      case "Lead":
+        return "bg-gray-500"
+      case "Qualified":
+        return "bg-blue-500"
+      case "Proposal":
+        return "bg-yellow-500"
+      case "Negotiation":
+        return "bg-orange-500"
+      case "Closed Won":
+        return "bg-green-500"
+      case "Closed Lost":
+        return "bg-red-500"
+      default:
+        return "bg-gray-500"
     }
   }
 
@@ -380,19 +261,29 @@ export default function DealsPage() {
     setDragOverStage(null)
 
     if (draggedDeal && targetStage !== "Closed Won" && targetStage !== "Closed Lost") {
-      setDeals(
-        deals.map((deal) =>
-          deal.id === draggedDeal
-            ? {
-                ...deal,
-                stage: targetStage,
-                lastUpdated: new Date().toISOString().split("T")[0],
-              }
-            : deal,
-        ),
-      )
+      updateDealStage(draggedDeal, targetStage)
     }
     setDraggedDeal(null)
+  }
+
+  const closeDealWon = (dealId: string) => {
+    if (confirm("Mark this deal as Closed Won?")) {
+      updateDealStage(dealId, "Closed Won")
+    }
+  }
+
+  const closeDealLost = (dealId: string) => {
+    if (confirm("Mark this deal as Closed Lost?")) {
+      updateDealStage(dealId, "Closed Lost")
+    }
+  }
+
+  const openAddDealDialog = (stage?: string) => {
+    resetForm()
+    if (stage) {
+      setNewDeal((prev) => ({ ...prev, stage }))
+    }
+    setIsDialogOpen(true)
   }
 
   // Calculate metrics
@@ -415,6 +306,30 @@ export default function DealsPage() {
     },
     {} as Record<string, typeof deals>,
   )
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading deals...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Failed to load deals</p>
+          <button onClick={() => mutate("/api/deals")} className="text-primary hover:underline">
+            Try again
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -570,7 +485,7 @@ export default function DealsPage() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => openEditDealDialog(deal)}>
+                                  <DropdownMenuItem onClick={() => openEditDialog(deal)}>
                                     <Edit className="mr-2 h-4 w-4" />
                                     Edit Deal
                                   </DropdownMenuItem>
@@ -690,7 +605,7 @@ export default function DealsPage() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => openEditDealDialog(deal)}>
+                                  <DropdownMenuItem onClick={() => openEditDialog(deal)}>
                                     <Edit className="mr-2 h-4 w-4" />
                                     Edit Deal
                                   </DropdownMenuItem>
@@ -788,7 +703,7 @@ export default function DealsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEditDealDialog(deal)}>
+                        <DropdownMenuItem onClick={() => openEditDialog(deal)}>
                           <Edit className="mr-2 h-4 w-4" />
                           Edit Deal
                         </DropdownMenuItem>
@@ -854,7 +769,7 @@ export default function DealsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEditDealDialog(deal)}>
+                        <DropdownMenuItem onClick={() => openEditDialog(deal)}>
                           <Edit className="mr-2 h-4 w-4" />
                           Edit Deal
                         </DropdownMenuItem>
@@ -1002,7 +917,7 @@ export default function DealsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {teamMembers.map((member) => (
+                    {[...teamMembers, ...users].map((member) => (
                       <SelectItem key={member.id} value={member.id}>
                         {member.name}
                       </SelectItem>
