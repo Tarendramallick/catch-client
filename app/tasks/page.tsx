@@ -1,7 +1,6 @@
 "use client"
 
-import { useState } from "react"
-import useSWR from "swr"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -33,8 +32,6 @@ import {
   Search,
 } from "lucide-react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 const initialTasks = [
   {
@@ -170,11 +167,10 @@ const getColumnForTask = (task: any) => {
 }
 
 export default function TasksPage() {
-  const { data: tasks = [], error, mutate } = useSWR("/api/tasks", fetcher)
-  const { data: users = [] } = useSWR("/api/users", fetcher)
-  const { data: contacts = [] } = useSWR("/api/contacts", fetcher)
-  const { data: companies = [] } = useSWR("/api/companies", fetcher)
-
+  const [tasks, setTasks] = useState(initialTasks)
+  const [users, setUsers] = useState<any[]>([])
+  const [contacts, setContacts] = useState<any[]>([])
+  const [companies, setCompanies] = useState<string[]>([])
   const [sortBy, setSortBy] = useState("dueDate")
   const [filterBy, setFilterBy] = useState("all")
   const [searchTerm, setSearchTerm] = useState("")
@@ -194,6 +190,34 @@ export default function TasksPage() {
     assigneeId: "1",
     client: "",
   })
+
+  // Load data from localStorage
+  useEffect(() => {
+    const savedTasks = localStorage.getItem("catchclients-tasks")
+    const savedUsers = localStorage.getItem("catchclients-users")
+    const savedContacts = localStorage.getItem("catchclients-contacts")
+    const savedCompanies = localStorage.getItem("catchclients-companies")
+
+    if (savedTasks) setTasks(JSON.parse(savedTasks))
+    if (savedUsers) setUsers(JSON.parse(savedUsers))
+    if (savedContacts) setContacts(JSON.parse(savedContacts))
+
+    if (savedCompanies) {
+      const companiesData = JSON.parse(savedCompanies)
+      setCompanies(companiesData.map((c: any) => c.name))
+    }
+
+    if (savedContacts) {
+      const contactsData = JSON.parse(savedContacts)
+      const contactCompanies = contactsData.map((c: any) => c.company)
+      setCompanies((prev) => [...new Set([...prev, ...contactCompanies])])
+    }
+  }, [])
+
+  // Save tasks to localStorage
+  useEffect(() => {
+    localStorage.setItem("catchclients-tasks", JSON.stringify(tasks))
+  }, [tasks])
 
   const resetForm = () => {
     setNewTask({
@@ -231,7 +255,7 @@ export default function TasksPage() {
     setIsDialogOpen(true)
   }
 
-  const handleSaveTask = async () => {
+  const handleSaveTask = () => {
     if (!newTask.title.trim()) {
       alert("Please enter a task title.")
       return
@@ -239,7 +263,8 @@ export default function TasksPage() {
 
     const assignee = [...teamMembers, ...users].find((member) => member.id === newTask.assigneeId)
 
-    const taskData = {
+    const task = {
+      id: `t${Date.now()}`,
       title: newTask.title,
       description: newTask.description,
       type: newTask.type,
@@ -253,63 +278,23 @@ export default function TasksPage() {
       avatar: assignee?.avatar || "/placeholder.svg?height=32&width=32",
     }
 
-    try {
-      await fetch("/api/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(taskData),
-      })
-
-      mutate()
-      setIsDialogOpen(false)
-      resetForm()
-    } catch (error) {
-      console.error("Error saving task:", error)
-      alert("Failed to save task. Please try again.")
-    }
+    setTasks([task, ...tasks])
+    setIsDialogOpen(false)
+    resetForm()
   }
 
-  const toggleTask = async (taskId: string) => {
-    const task = tasks.find((t: any) => t.id === taskId || t._id === taskId)
-    if (!task) return
-
-    try {
-      await fetch(`/api/tasks/${taskId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ completed: !task.completed }),
-      })
-
-      mutate()
-    } catch (error) {
-      console.error("Error updating task:", error)
-      alert("Failed to update task. Please try again.")
-    }
+  const toggleTask = (taskId: string) => {
+    setTasks(tasks.map((task) => (task.id === taskId ? { ...task, completed: !task.completed } : task)))
   }
 
-  const deleteTask = async (taskId: string) => {
+  const deleteTask = (taskId: string) => {
     if (confirm("Are you sure you want to delete this task?")) {
-      try {
-        await fetch(`/api/tasks/${taskId}`, {
-          method: "DELETE",
-        })
-
-        mutate()
-      } catch (error) {
-        console.error("Error deleting task:", error)
-        alert("Failed to delete task. Please try again.")
-      }
+      setTasks(tasks.filter((task) => task.id !== taskId))
     }
   }
 
-  if (error) return <div>Failed to load tasks</div>
-  if (!tasks) return <div>Loading...</div>
-
-  const companyNames = companies.map((c: any) => c.name || c.company || c)
-  const contactCompanies = contacts.map((c: any) => c.company).filter(Boolean)
-  const allCompanies = [...new Set([...companyNames, ...contactCompanies])]
-
-  const filteredTasks = tasks.filter((task: any) => {
+  // Filter tasks based on search and filters
+  const filteredTasks = tasks.filter((task) => {
     const matchesSearch =
       task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       task.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -326,12 +311,13 @@ export default function TasksPage() {
     return matchesSearch && matchesFilter
   })
 
+  // Group tasks by columns
   const taskColumns = {
-    overdue: filteredTasks.filter((task: any) => getColumnForTask(task) === "overdue"),
-    today: filteredTasks.filter((task: any) => getColumnForTask(task) === "today"),
-    thisWeek: filteredTasks.filter((task: any) => getColumnForTask(task) === "thisWeek"),
-    upcoming: filteredTasks.filter((task: any) => getColumnForTask(task) === "upcoming"),
-    completed: filteredTasks.filter((task: any) => task.completed),
+    overdue: filteredTasks.filter((task) => getColumnForTask(task) === "overdue"),
+    today: filteredTasks.filter((task) => getColumnForTask(task) === "today"),
+    thisWeek: filteredTasks.filter((task) => getColumnForTask(task) === "thisWeek"),
+    upcoming: filteredTasks.filter((task) => getColumnForTask(task) === "upcoming"),
+    completed: filteredTasks.filter((task) => task.completed),
   }
 
   const TaskCard = ({ task }: { task: any }) => (
@@ -346,7 +332,7 @@ export default function TasksPage() {
             <Badge className={getPriorityColor(task.priority)} variant="outline">
               {task.priority}
             </Badge>
-            <Button variant="ghost" size="sm" onClick={() => toggleTask(task.id || task._id)} className="h-6 w-6 p-0">
+            <Button variant="ghost" size="sm" onClick={() => toggleTask(task.id)} className="h-6 w-6 p-0">
               {task.completed ? (
                 <CheckCircle className="h-4 w-4 text-green-500" />
               ) : (
@@ -365,7 +351,7 @@ export default function TasksPage() {
               <AvatarFallback className="text-xs">
                 {task.assignee
                   .split(" ")
-                  .map((n: string) => n[0])
+                  .map((n) => n[0])
                   .join("")}
               </AvatarFallback>
             </Avatar>
@@ -789,7 +775,7 @@ export default function TasksPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {[...teamMembers, ...users].map((member: any) => (
+                    {[...teamMembers, ...users].map((member) => (
                       <SelectItem key={member.id} value={member.id}>
                         {member.name}
                       </SelectItem>
@@ -805,7 +791,7 @@ export default function TasksPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Internal">Internal</SelectItem>
-                    {allCompanies.map((company: string) => (
+                    {companies.map((company) => (
                       <SelectItem key={company} value={company}>
                         {company}
                       </SelectItem>
