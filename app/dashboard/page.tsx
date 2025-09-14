@@ -1,32 +1,12 @@
 "use client"
 
-import { Progress } from "@/components/ui/progress"
-
-import { AvatarFallback } from "@/components/ui/avatar"
-
-import { AvatarImage } from "@/components/ui/avatar"
-
-import { Avatar } from "@/components/ui/avatar"
-
-import { CardContent } from "@/components/ui/card"
-
-import { CardDescription } from "@/components/ui/card"
-
-import { CardTitle } from "@/components/ui/card"
-
-import { CardHeader } from "@/components/ui/card"
-
-import { Card } from "@/components/ui/card"
-;```tsx file="app/dashboard/page.tsx"
-"use client"
-
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
-import { Plus, TrendingUp, Users, DollarSign, Target, Calendar, User, Building2, Loader2 } from 'lucide-react'
+import { Plus, TrendingUp, Users, DollarSign, Target, Calendar, User, Building2, Loader2 } from "lucide-react"
 import { PipelineChart } from "@/components/pipeline-chart"
 import { RevenueChart } from "@/components/revenue-chart"
 import { ActivityFeed } from "@/components/activity-feed"
@@ -41,27 +21,27 @@ export default function Dashboard() {
     const fetchDashboardData = async () => {
       try {
         setLoading(true)
-        
+
         // Fetch analytics data
         const analyticsResponse = await fetch("/api/analytics")
         const analyticsResult = await analyticsResponse.json()
-        
+
         // Fetch recent deals
         const dealsResponse = await fetch("/api/deals?limit=5&sort=updatedDate")
         const dealsResult = await dealsResponse.json()
-        
+
         // Fetch upcoming tasks
         const tasksResponse = await fetch("/api/tasks?completed=false&limit=5&sort=dueDate")
         const tasksResult = await tasksResponse.json()
-        
+
         if (analyticsResult.success) {
           setAnalytics(analyticsResult.data)
         }
-        
+
         if (dealsResult.success) {
           setRecentDeals(dealsResult.data || [])
         }
-        
+
         if (tasksResult.success) {
           setUpcomingTasks(tasksResult.data || [])
         }
@@ -140,9 +120,7 @@ export default function Dashboard() {
             <DollarSign className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg md:text-2xl font-bold">
-              ${analytics?.revenue?.current?.toLocaleString() || "0"}
-            </div>
+            <div className="text-lg md:text-2xl font-bold">${analytics?.revenue?.current?.toLocaleString() || "0"}</div>
             <p className="text-xs text-muted-foreground">
               <span className="text-green-600">+{analytics?.revenue?.growth || 0}%</span> from last month
             </p>
@@ -234,7 +212,7 @@ export default function Dashboard() {
                       <div className="space-y-2">
                         <div className="flex items-start justify-between">
                           <h4 className="font-medium text-sm truncate pr-2">{deal.title}</h4>
-                          <Badge variant="secondary" className={\`text-xs ${getStageColor(deal.stage)} shrink-0\`}>
+                          <Badge variant="secondary" className={`text-xs ${getStageColor(deal.stage)} shrink-0`}>
                             {deal.stage}
                           </Badge>
                         </div>
@@ -297,13 +275,13 @@ export default function Dashboard() {
                 <div key={task.id} className="flex items-start gap-3 p-3 border rounded-lg">
                   <div className="mt-1">
                     <div
-                      className={\`w-2 h-2 rounded-full ${
+                      className={`w-2 h-2 rounded-full ${
                         task.priority === "high"
                           ? "bg-red-500"
                           : task.priority === "medium"
                             ? "bg-yellow-500"
                             : "bg-green-500"
-                      }\`}\
+                      }`}
                     />
                   </div>
                   <div className="flex-1 min-w-0 space-y-1">
@@ -321,12 +299,9 @@ export default function Dashboard() {
                     </div>
                     <p className="text-xs text-muted-foreground truncate">{task.client}</p>
                   </div>
-                  <Badge variant="outline" className={\`text-xs shrink-0 ${getPriorityColor(task.priority)}`
-}>\
-{
-  task.priority
-}
-</Badge>
+                  <Badge variant="outline" className={`text-xs shrink-0 ${getPriorityColor(task.priority)}`}>
+                    {task.priority}
+                  </Badge>
                 </div>
               ))
             )}
@@ -334,67 +309,61 @@ export default function Dashboard() {
         </Card>
       </div>
 
-{
-  /* Team Performance */
-}
-{
-  analytics?.team?.performance && analytics.team.performance.length > 0 && (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base md:text-lg">Team Performance</CardTitle>
-        <CardDescription className="text-sm">Individual performance metrics</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4 md:space-y-6">
-          {analytics.team.performance.map((member: any, index: number) => (
-            <div key={index} className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-8 w-8 md:h-10 md:w-10">
-                    <AvatarImage
-                      src={`/placeholder-40x40.png?height=40&width=40&text=${member.name
-                        .split(" ")
-                        .map((n: string) => n[0])
-                        .join("")}`}
-                    />
-                    <AvatarFallback>
-                      {member.name
-                        .split(" ")
-                        .map((n: string) => n[0])
-                        .join("")}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium text-sm md:text-base">{member.name}</p>
-                    <p className="text-xs md:text-sm text-muted-foreground">{member.deals} deals</p>
+      {/* Team Performance */}
+      {analytics?.team?.performance && analytics.team.performance.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base md:text-lg">Team Performance</CardTitle>
+            <CardDescription className="text-sm">Individual performance metrics</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4 md:space-y-6">
+              {analytics.team.performance.map((member: any, index: number) => (
+                <div key={index} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-8 w-8 md:h-10 md:w-10">
+                        <AvatarImage
+                          src={`/placeholder-40x40.png?height=40&width=40&text=${member.name
+                            .split(" ")
+                            .map((n: string) => n[0])
+                            .join("")}`}
+                        />
+                        <AvatarFallback>
+                          {member.name
+                            .split(" ")
+                            .map((n: string) => n[0])
+                            .join("")}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium text-sm md:text-base">{member.name}</p>
+                        <p className="text-xs md:text-sm text-muted-foreground">{member.deals} deals</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-sm md:text-base">${member.revenue.toLocaleString()}</p>
+                      <p className="text-xs md:text-sm text-muted-foreground">of ${member.target.toLocaleString()}</p>
+                    </div>
                   </div>
+                  <Progress value={(member.revenue / member.target) * 100} className="h-2" />
                 </div>
-                <div className="text-right">
-                  <p className="font-medium text-sm md:text-base">${member.revenue.toLocaleString()}</p>
-                  <p className="text-xs md:text-sm text-muted-foreground">of ${member.target.toLocaleString()}</p>
-                </div>
-              </div>
-              <Progress value={(member.revenue / member.target) * 100} className="h-2" />
+              ))}
             </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
+          </CardContent>
+        </Card>
+      )}
 
-{
-  /* Activity Feed */
-}
-;<Card>
-  <CardHeader>
-    <CardTitle className="text-base md:text-lg">Recent Activity</CardTitle>
-    <CardDescription className="text-sm">Latest updates across your CRM</CardDescription>
-  </CardHeader>
-  <CardContent>
-    <ActivityFeed />
-  </CardContent>
-</Card>
-</div>
+      {/* Activity Feed */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base md:text-lg">Recent Activity</CardTitle>
+          <CardDescription className="text-sm">Latest updates across your CRM</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ActivityFeed />
+        </CardContent>
+      </Card>
+    </div>
   )
 }
