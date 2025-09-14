@@ -154,7 +154,7 @@ const getPriorityColor = (priority: string) => {
 }
 
 const getColumnForTask = (task: any) => {
-  if (task.completed) return "completed"
+  if (task.completed || task.status === "completed") return "completed"
 
   const today = new Date()
   const taskDate = new Date(task.dueDate)
@@ -167,7 +167,10 @@ const getColumnForTask = (task: any) => {
   return "upcoming"
 }
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json())
+const fetcher = (url: string) =>
+  fetch(url)
+    .then((res) => res.json())
+    .then((json) => json.data || [])
 
 export default function TasksPage() {
   const { data: tasks = [], error: tasksError, mutate: mutateTasks } = useSWR("/api/tasks", fetcher)
@@ -246,11 +249,7 @@ export default function TasksPage() {
       priority: newTask.priority,
       dueDate: newTask.dueDate || new Date().toISOString().split("T")[0],
       dueTime: newTask.dueTime || "End of day",
-      completed: false,
       assigneeId: newTask.assigneeId,
-      assignee: assignee?.name || "Unknown",
-      client: newTask.client || "Internal",
-      avatar: assignee?.avatar || "/placeholder.svg?height=32&width=32",
     }
 
     try {
@@ -265,7 +264,8 @@ export default function TasksPage() {
         setIsDialogOpen(false)
         resetForm()
       } else {
-        alert("Failed to create task")
+        const errorData = await response.json()
+        alert(`Failed to create task: ${errorData.error || "Unknown error"}`)
       }
     } catch (error) {
       console.error("Error creating task:", error)
@@ -281,13 +281,14 @@ export default function TasksPage() {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ completed: !task.completed }),
+        body: JSON.stringify({ status: task.completed || task.status === "completed" ? "pending" : "completed" }),
       })
 
       if (response.ok) {
         mutateTasks() // Refresh tasks data
       } else {
-        alert("Failed to update task")
+        const errorData = await response.json()
+        alert(`Failed to update task: ${errorData.error || "Unknown error"}`)
       }
     } catch (error) {
       console.error("Error updating task:", error)
@@ -322,12 +323,12 @@ export default function TasksPage() {
     const matchesSearch =
       task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       task.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      task.client.toLowerCase().includes(searchTerm.toLowerCase())
+      (task.client || task.companyId || "Internal").toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesFilter =
       filterBy === "all" ||
-      (filterBy === "completed" && task.completed) ||
-      (filterBy === "pending" && !task.completed) ||
+      (filterBy === "completed" && (task.completed || task.status === "completed")) ||
+      (filterBy === "pending" && !(task.completed || task.status === "completed")) ||
       (filterBy === "high" && task.priority === "high") ||
       (filterBy === "today" && getColumnForTask(task) === "today") ||
       (filterBy === "overdue" && getColumnForTask(task) === "overdue")
@@ -340,23 +341,29 @@ export default function TasksPage() {
     today: filteredTasks.filter((task: any) => getColumnForTask(task) === "today"),
     thisWeek: filteredTasks.filter((task: any) => getColumnForTask(task) === "thisWeek"),
     upcoming: filteredTasks.filter((task: any) => getColumnForTask(task) === "upcoming"),
-    completed: filteredTasks.filter((task: any) => task.completed),
+    completed: filteredTasks.filter((task: any) => task.completed || task.status === "completed"),
   }
 
   const TaskCard = ({ task }: { task: any }) => (
-    <Card className={`mb-3 hover:shadow-md transition-shadow ${task.completed ? "opacity-75" : ""}`}>
+    <Card
+      className={`mb-3 hover:shadow-md transition-shadow ${task.completed || task.status === "completed" ? "opacity-75" : ""}`}
+    >
       <CardContent className="p-3 md:p-4">
         <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-2 flex-1 min-w-0">
             {getTaskIcon(task.type)}
-            <h4 className={`font-medium text-sm ${task.completed ? "line-through" : ""} truncate`}>{task.title}</h4>
+            <h4
+              className={`font-medium text-sm ${task.completed || task.status === "completed" ? "line-through" : ""} truncate`}
+            >
+              {task.title}
+            </h4>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <Badge className={getPriorityColor(task.priority)} variant="outline">
               {task.priority}
             </Badge>
             <Button variant="ghost" size="sm" onClick={() => toggleTask(task.id)} className="h-6 w-6 p-0">
-              {task.completed ? (
+              {task.completed || task.status === "completed" ? (
                 <CheckCircle className="h-4 w-4 text-green-500" />
               ) : (
                 <div className="h-4 w-4 border-2 border-gray-300 rounded" />
@@ -372,13 +379,13 @@ export default function TasksPage() {
             <Avatar className="h-5 w-5 flex-shrink-0">
               <AvatarImage src={task.avatar || "/placeholder.svg"} />
               <AvatarFallback className="text-xs">
-                {task.assignee
+                {(task.assignee || "Unknown")
                   .split(" ")
                   .map((n) => n[0])
                   .join("")}
               </AvatarFallback>
             </Avatar>
-            <span className="truncate">{task.assignee}</span>
+            <span className="truncate">{task.assignee || "Unknown"}</span>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
             <Clock className="h-3 w-3" />
@@ -387,7 +394,7 @@ export default function TasksPage() {
         </div>
 
         <div className="flex items-center justify-between mt-2 text-xs">
-          <span className="text-muted-foreground truncate flex-1">{task.client}</span>
+          <span className="text-muted-foreground truncate flex-1">{task.client || task.companyId || "Internal"}</span>
           <span className="text-muted-foreground flex-shrink-0 ml-2">
             {new Date(task.dueDate).toLocaleDateString()}
           </span>
