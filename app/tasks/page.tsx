@@ -1,6 +1,5 @@
 "use client"
 
-import { useEffect } from "react"
 import { useState } from "react"
 import useSWR from "swr"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -35,18 +34,88 @@ import {
 } from "lucide-react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
-console.log("[v0] Tasks page loading...")
+const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
-const fetcher = (url: string) => {
-  console.log("[v0] Fetching from:", url)
-  return fetch(url).then((res) => {
-    console.log("[v0] Response status:", res.status)
-    if (!res.ok) {
-      throw new Error(`HTTP error! status: ${res.status}`)
-    }
-    return res.json()
-  })
-}
+const initialTasks = [
+  {
+    id: "t1",
+    title: "Follow up with Acme Corp",
+    description: "Discuss pricing and implementation timeline",
+    type: "call",
+    priority: "high",
+    dueDate: "2024-01-15",
+    dueTime: "2:00 PM",
+    completed: false,
+    assigneeId: "1",
+    assignee: "Sarah Johnson",
+    contactId: "c1",
+    dealId: "d1",
+    client: "Acme Corp",
+    avatar: "/placeholder.svg?height=32&width=32",
+  },
+  {
+    id: "t2",
+    title: "Send proposal to TechStart",
+    description: "Include custom development package details",
+    type: "email",
+    priority: "high",
+    dueDate: "2024-01-15",
+    dueTime: "4:30 PM",
+    completed: false,
+    assigneeId: "2",
+    assignee: "Mike Chen",
+    contactId: "c2",
+    dealId: "d2",
+    client: "TechStart Inc",
+    avatar: "/placeholder.svg?height=32&width=32",
+  },
+  {
+    id: "t3",
+    title: "Demo meeting with Global Solutions",
+    description: "Product demonstration and Q&A session",
+    type: "meeting",
+    priority: "medium",
+    dueDate: "2024-01-16",
+    dueTime: "10:00 AM",
+    completed: false,
+    assigneeId: "3",
+    assignee: "Emma Davis",
+    contactId: "c3",
+    dealId: "d3",
+    client: "Global Solutions",
+    avatar: "/placeholder.svg?height=32&width=32",
+  },
+  {
+    id: "t4",
+    title: "Update CRM records",
+    description: "Add notes from last week's client meetings",
+    type: "task",
+    priority: "low",
+    dueDate: "2024-01-17",
+    dueTime: "End of day",
+    completed: true,
+    assigneeId: "4",
+    assignee: "Alex Rodriguez",
+    client: "Internal",
+    avatar: "/placeholder.svg?height=32&width=32",
+  },
+  {
+    id: "t5",
+    title: "Prepare contract for Acme Corp",
+    description: "Draft contract based on approved proposal",
+    type: "task",
+    priority: "high",
+    dueDate: "2024-01-18",
+    dueTime: "12:00 PM",
+    completed: false,
+    assigneeId: "1",
+    assignee: "Sarah Johnson",
+    contactId: "c1",
+    dealId: "d1",
+    client: "Acme Corp",
+    avatar: "/placeholder.svg?height=32&width=32",
+  },
+]
 
 const teamMembers = [
   { id: "1", name: "Sarah Johnson", avatar: "/placeholder.svg?height=32&width=32" },
@@ -101,24 +170,11 @@ const getColumnForTask = (task: any) => {
 }
 
 export default function TasksPage() {
-  console.log("[v0] TasksPage component rendering...")
+  const { data: tasks = [], error, mutate } = useSWR("/api/tasks", fetcher)
+  const { data: users = [] } = useSWR("/api/users", fetcher)
+  const { data: contacts = [] } = useSWR("/api/contacts", fetcher)
+  const { data: companies = [] } = useSWR("/api/companies", fetcher)
 
-  const {
-    data: tasks = [],
-    error,
-    mutate,
-  } = useSWR("/api/tasks", fetcher, {
-    onError: (error) => {
-      console.error("[v0] Tasks SWR error:", error)
-    },
-    onSuccess: (data) => {
-      console.log("[v0] Tasks loaded successfully:", data?.length || 0, "items")
-    },
-  })
-
-  const [users, setUsers] = useState<any[]>([])
-  const [contacts, setContacts] = useState<any[]>([])
-  const [companies, setCompanies] = useState<string[]>([])
   const [sortBy, setSortBy] = useState("dueDate")
   const [filterBy, setFilterBy] = useState("all")
   const [searchTerm, setSearchTerm] = useState("")
@@ -138,54 +194,6 @@ export default function TasksPage() {
     assigneeId: "1",
     client: "",
   })
-
-  useEffect(() => {
-    const loadAdditionalData = async () => {
-      try {
-        // Load users from API
-        const usersResponse = await fetch("/api/users")
-        if (usersResponse.ok) {
-          const usersData = await usersResponse.json()
-          setUsers(usersData)
-        }
-
-        // Load contacts from API
-        const contactsResponse = await fetch("/api/contacts")
-        if (contactsResponse.ok) {
-          const contactsData = await contactsResponse.json()
-          setContacts(contactsData)
-
-          // Extract company names from contacts
-          const contactCompanies = contactsData.map((c: any) => c.company).filter(Boolean)
-          setCompanies((prev) => [...new Set([...prev, ...contactCompanies])])
-        }
-
-        // Load companies from API
-        const companiesResponse = await fetch("/api/companies")
-        if (companiesResponse.ok) {
-          const companiesData = await companiesResponse.json()
-          const companyNames = companiesData.map((c: any) => c.name).filter(Boolean)
-          setCompanies((prev) => [...new Set([...prev, ...companyNames])])
-        }
-      } catch (error) {
-        console.error("[v0] Error loading additional data:", error)
-        // Fallback to localStorage if API fails
-        const savedUsers = localStorage.getItem("catchclients-users")
-        const savedContacts = localStorage.getItem("catchclients-contacts")
-        const savedCompanies = localStorage.getItem("catchclients-companies")
-
-        if (savedUsers) setUsers(JSON.parse(savedUsers))
-        if (savedContacts) setContacts(JSON.parse(savedContacts))
-
-        if (savedCompanies) {
-          const companiesData = JSON.parse(savedCompanies)
-          setCompanies(companiesData.map((c: any) => c.name))
-        }
-      }
-    }
-
-    loadAdditionalData()
-  }, [])
 
   const resetForm = () => {
     setNewTask({
@@ -252,31 +260,30 @@ export default function TasksPage() {
         body: JSON.stringify(taskData),
       })
 
-      mutate() // Refresh data
+      mutate()
       setIsDialogOpen(false)
       resetForm()
     } catch (error) {
       console.error("Error saving task:", error)
-      alert("Failed to save task")
+      alert("Failed to save task. Please try again.")
     }
   }
 
   const toggleTask = async (taskId: string) => {
-    const task = tasks.find((t: any) => t._id === taskId)
+    const task = tasks.find((t: any) => t.id === taskId || t._id === taskId)
     if (!task) return
 
     try {
       await fetch(`/api/tasks/${taskId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          completed: !task.completed,
-        }),
+        body: JSON.stringify({ completed: !task.completed }),
       })
-      mutate() // Refresh data
+
+      mutate()
     } catch (error) {
       console.error("Error updating task:", error)
-      alert("Failed to update task")
+      alert("Failed to update task. Please try again.")
     }
   }
 
@@ -286,74 +293,45 @@ export default function TasksPage() {
         await fetch(`/api/tasks/${taskId}`, {
           method: "DELETE",
         })
-        mutate() // Refresh data
+
+        mutate()
       } catch (error) {
         console.error("Error deleting task:", error)
-        alert("Failed to delete task")
+        alert("Failed to delete task. Please try again.")
       }
     }
   }
 
-  // Filter tasks based on search and filters
-  const filteredTasks = Array.isArray(tasks)
-    ? tasks.filter((task) => {
-        if (!task) {
-          console.warn("[v0] Found null/undefined task:", task)
-          return false
-        }
+  if (error) return <div>Failed to load tasks</div>
+  if (!tasks) return <div>Loading...</div>
 
-        const matchesSearch =
-          (task.title || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (task.description || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (task.client || "").toLowerCase().includes(searchTerm.toLowerCase())
+  const companyNames = companies.map((c: any) => c.name || c.company || c)
+  const contactCompanies = contacts.map((c: any) => c.company).filter(Boolean)
+  const allCompanies = [...new Set([...companyNames, ...contactCompanies])]
 
-        const matchesFilter =
-          filterBy === "all" ||
-          (filterBy === "completed" && task.completed) ||
-          (filterBy === "pending" && !task.completed) ||
-          (filterBy === "high" && task.priority === "high") ||
-          (filterBy === "today" && getColumnForTask(task) === "today") ||
-          (filterBy === "overdue" && getColumnForTask(task) === "overdue")
+  const filteredTasks = tasks.filter((task: any) => {
+    const matchesSearch =
+      task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      task.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      task.client.toLowerCase().includes(searchTerm.toLowerCase())
 
-        return matchesSearch && matchesFilter
-      })
-    : []
+    const matchesFilter =
+      filterBy === "all" ||
+      (filterBy === "completed" && task.completed) ||
+      (filterBy === "pending" && !task.completed) ||
+      (filterBy === "high" && task.priority === "high") ||
+      (filterBy === "today" && getColumnForTask(task) === "today") ||
+      (filterBy === "overdue" && getColumnForTask(task) === "overdue")
 
-  // Group tasks by columns
+    return matchesSearch && matchesFilter
+  })
+
   const taskColumns = {
-    overdue: filteredTasks.filter((task) => {
-      try {
-        return getColumnForTask(task) === "overdue"
-      } catch (error) {
-        console.error("[v0] Error categorizing task:", task, error)
-        return false
-      }
-    }),
-    today: filteredTasks.filter((task) => {
-      try {
-        return getColumnForTask(task) === "today"
-      } catch (error) {
-        console.error("[v0] Error categorizing task:", task, error)
-        return false
-      }
-    }),
-    thisWeek: filteredTasks.filter((task) => {
-      try {
-        return getColumnForTask(task) === "thisWeek"
-      } catch (error) {
-        console.error("[v0] Error categorizing task:", task, error)
-        return false
-      }
-    }),
-    upcoming: filteredTasks.filter((task) => {
-      try {
-        return getColumnForTask(task) === "upcoming"
-      } catch (error) {
-        console.error("[v0] Error categorizing task:", task, error)
-        return false
-      }
-    }),
-    completed: filteredTasks.filter((task) => task.completed),
+    overdue: filteredTasks.filter((task: any) => getColumnForTask(task) === "overdue"),
+    today: filteredTasks.filter((task: any) => getColumnForTask(task) === "today"),
+    thisWeek: filteredTasks.filter((task: any) => getColumnForTask(task) === "thisWeek"),
+    upcoming: filteredTasks.filter((task: any) => getColumnForTask(task) === "upcoming"),
+    completed: filteredTasks.filter((task: any) => task.completed),
   }
 
   const TaskCard = ({ task }: { task: any }) => (
@@ -368,7 +346,7 @@ export default function TasksPage() {
             <Badge className={getPriorityColor(task.priority)} variant="outline">
               {task.priority}
             </Badge>
-            <Button variant="ghost" size="sm" onClick={() => toggleTask(task._id)} className="h-6 w-6 p-0">
+            <Button variant="ghost" size="sm" onClick={() => toggleTask(task.id || task._id)} className="h-6 w-6 p-0">
               {task.completed ? (
                 <CheckCircle className="h-4 w-4 text-green-500" />
               ) : (
@@ -387,7 +365,7 @@ export default function TasksPage() {
               <AvatarFallback className="text-xs">
                 {task.assignee
                   .split(" ")
-                  .map((n) => n[0])
+                  .map((n: string) => n[0])
                   .join("")}
               </AvatarFallback>
             </Avatar>
@@ -408,33 +386,6 @@ export default function TasksPage() {
       </CardContent>
     </Card>
   )
-
-  if (error) {
-    console.error("[v0] Tasks page error:", error)
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <h2 className="text-lg font-semibold mb-2">Failed to load tasks</h2>
-          <p className="text-muted-foreground mb-4">Error: {error.message || "Unknown error"}</p>
-          <Button onClick={() => mutate()}>Try Again</Button>
-        </div>
-      </div>
-    )
-  }
-
-  if (!tasks && !error) {
-    console.log("[v0] Tasks still loading...")
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading tasks...</p>
-        </div>
-      </div>
-    )
-  }
-
-  console.log("[v0] Rendering tasks page with", filteredTasks.length, "filtered tasks")
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -519,44 +470,36 @@ export default function TasksPage() {
           </CardContent>
         </Card>
         <Card className="p-3 md:p-6">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-xs md:text-sm font-medium">Today</CardTitle>
-              <Calendar className="h-3 w-3 md:h-4 md:w-4 text-blue-500" />
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
+            <CardTitle className="text-xs md:text-sm font-medium">Today</CardTitle>
+            <Calendar className="h-3 w-3 md:h-4 md:w-4 text-blue-500" />
           </CardHeader>
           <CardContent className="p-0 pt-2">
             <div className="text-lg md:text-2xl font-bold text-blue-600">{taskColumns.today.length}</div>
           </CardContent>
         </Card>
         <Card className="p-3 md:p-6">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-xs md:text-sm font-medium">This Week</CardTitle>
-              <Clock className="h-3 w-3 md:h-4 md:w-4 text-yellow-500" />
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
+            <CardTitle className="text-xs md:text-sm font-medium">This Week</CardTitle>
+            <Clock className="h-3 w-3 md:h-4 md:w-4 text-yellow-500" />
           </CardHeader>
           <CardContent className="p-0 pt-2">
             <div className="text-lg md:text-2xl font-bold text-yellow-600">{taskColumns.thisWeek.length}</div>
           </CardContent>
         </Card>
         <Card className="p-3 md:p-6">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-xs md:text-sm font-medium">Upcoming</CardTitle>
-              <Target className="h-3 w-3 md:h-4 md:w-4 text-green-500" />
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
+            <CardTitle className="text-xs md:text-sm font-medium">Upcoming</CardTitle>
+            <Target className="h-3 w-3 md:h-4 md:w-4 text-green-500" />
           </CardHeader>
           <CardContent className="p-0 pt-2">
             <div className="text-lg md:text-2xl font-bold text-green-600">{taskColumns.upcoming.length}</div>
           </CardContent>
         </Card>
         <Card className="p-3 md:p-6 col-span-2 md:col-span-1">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-xs md:text-sm font-medium">Completed</CardTitle>
-              <CheckCircle className="h-3 w-3 md:h-4 md:w-4 text-purple-500" />
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
+            <CardTitle className="text-xs md:text-sm font-medium">Completed</CardTitle>
+            <CheckCircle className="h-3 w-3 md:h-4 md:w-4 text-purple-500" />
           </CardHeader>
           <CardContent className="p-0 pt-2">
             <div className="text-lg md:text-2xl font-bold text-purple-600">{taskColumns.completed.length}</div>
@@ -621,7 +564,7 @@ export default function TasksPage() {
                   </CardHeader>
                   <CardContent className="space-y-3 max-h-96 overflow-y-auto">
                     {taskColumns[column as keyof typeof taskColumns]?.map((task) => (
-                      <TaskCard key={task._id} task={task} />
+                      <TaskCard key={task.id} task={task} />
                     ))}
                     {taskColumns[column as keyof typeof taskColumns]?.length === 0 && (
                       <p className="text-sm text-muted-foreground text-center py-4">No tasks</p>
@@ -686,7 +629,7 @@ export default function TasksPage() {
                 </CardHeader>
                 <CardContent className="space-y-3 max-h-96 overflow-y-auto">
                   {taskColumns[column as keyof typeof taskColumns]?.map((task) => (
-                    <TaskCard key={task._id} task={task} />
+                    <TaskCard key={task.id} task={task} />
                   ))}
                   {taskColumns[column as keyof typeof taskColumns]?.length === 0 && (
                     <p className="text-sm text-muted-foreground text-center py-4">No tasks</p>
@@ -704,7 +647,7 @@ export default function TasksPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {filteredTasks.map((task) => (
-              <TaskCard key={task._id} task={task} />
+              <TaskCard key={task.id} task={task} />
             ))}
             {filteredTasks.length === 0 && (
               <div className="text-center py-8">
@@ -739,7 +682,7 @@ export default function TasksPage() {
             <CardContent className="pt-0">
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 max-h-96 overflow-y-auto">
                 {taskColumns.completed.map((task) => (
-                  <TaskCard key={task._id} task={task} />
+                  <TaskCard key={task.id} task={task} />
                 ))}
                 {taskColumns.completed.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center py-4 col-span-full">No completed tasks yet</p>
@@ -846,7 +789,7 @@ export default function TasksPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {[...teamMembers, ...users].map((member) => (
+                    {[...teamMembers, ...users].map((member: any) => (
                       <SelectItem key={member.id} value={member.id}>
                         {member.name}
                       </SelectItem>
@@ -862,7 +805,7 @@ export default function TasksPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Internal">Internal</SelectItem>
-                    {companies.map((company) => (
+                    {allCompanies.map((company: string) => (
                       <SelectItem key={company} value={company}>
                         {company}
                       </SelectItem>
