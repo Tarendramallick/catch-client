@@ -207,7 +207,7 @@ export default function CompaniesPage() {
       if (editingCompany) {
         // Update existing company
         const response = await fetch(`/api/companies/${editingCompany._id || editingCompany.id}`, {
-          method: "PATCH",
+          method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData),
         })
@@ -236,6 +236,7 @@ export default function CompaniesPage() {
       setIsDialogOpen(false)
     } catch (error) {
       console.error("Error saving company:", error)
+      alert("Failed to save company")
     }
   }
 
