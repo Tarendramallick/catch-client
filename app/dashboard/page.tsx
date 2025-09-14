@@ -1,59 +1,80 @@
 "use client"
-
-import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
-import { Plus, TrendingUp, Users, DollarSign, Target, Calendar, User, Building2, Loader2 } from "lucide-react"
+import { Plus, TrendingUp, Users, DollarSign, Target, Calendar, User, Building2 } from "lucide-react"
 import { PipelineChart } from "@/components/pipeline-chart"
 import { RevenueChart } from "@/components/revenue-chart"
 import { ActivityFeed } from "@/components/activity-feed"
+import useSWR from "swr"
+
+const fetcher = async (url: string) => {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error("Failed to fetch")
+  const data = await res.json()
+  return data.data || data
+}
 
 export default function Dashboard() {
-  const [analytics, setAnalytics] = useState<any>(null)
-  const [recentDeals, setRecentDeals] = useState<any[]>([])
-  const [upcomingTasks, setUpcomingTasks] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: deals = [] } = useSWR("/api/deals", fetcher)
+  const { data: tasks = [] } = useSWR("/api/tasks", fetcher)
+  const { data: contacts = [] } = useSWR("/api/contacts", fetcher)
+  const { data: users = [] } = useSWR("/api/users", fetcher)
+  const { data: companies = [] } = useSWR("/api/companies", fetcher)
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true)
+  const activeDeals = deals.filter((deal: any) => !["closed-won", "closed-lost"].includes(deal.stage?.toLowerCase()))
+  const closedWonDeals = deals.filter((deal: any) => deal.stage?.toLowerCase() === "closed-won")
+  const totalRevenue = closedWonDeals.reduce((sum: number, deal: any) => sum + (deal.value || 0), 0)
+  const conversionRate = deals.length > 0 ? (closedWonDeals.length / deals.length) * 100 : 0
 
-        // Fetch analytics data
-        const analyticsResponse = await fetch("/api/analytics")
-        const analyticsResult = await analyticsResponse.json()
+  const recentDeals = deals
+    .sort(
+      (a: any, b: any) =>
+        new Date(b.updatedAt || b.createdAt || "").getTime() - new Date(a.updatedAt || a.createdAt || "").getTime(),
+    )
+    .slice(0, 3)
+    .map((deal: any) => ({
+      id: deal._id || deal.id,
+      name: deal.title || deal.name,
+      company: deal.client || deal.company,
+      value: deal.value || 0,
+      stage: deal.stage || "lead",
+      probability: deal.probability || 0,
+      contact: deal.assignee || "Unassigned",
+      phone: "",
+      email: "",
+    }))
 
-        // Fetch recent deals
-        const dealsResponse = await fetch("/api/deals?limit=5&sort=updatedDate")
-        const dealsResult = await dealsResponse.json()
+  const upcomingTasks = tasks
+    .filter((task: any) => !task.completed && task.status !== "completed")
+    .sort((a: any, b: any) => new Date(a.dueDate || "").getTime() - new Date(b.dueDate || "").getTime())
+    .slice(0, 3)
+    .map((task: any) => ({
+      id: task._id || task.id,
+      title: task.title,
+      dueDate: task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "No date",
+      priority: task.priority || "medium",
+      assignee: task.assignee || "Unassigned",
+      company: task.client || "Unknown",
+    }))
 
-        // Fetch upcoming tasks
-        const tasksResponse = await fetch("/api/tasks?completed=false&limit=5&sort=dueDate")
-        const tasksResult = await tasksResponse.json()
+  const teamPerformance = users
+    .map((user: any) => {
+      const userDeals = deals.filter((deal: any) => deal.assigneeId === user._id || deal.assignee === user.name)
+      const userRevenue = userDeals
+        .filter((deal: any) => deal.stage?.toLowerCase() === "closed-won")
+        .reduce((sum: number, deal: any) => sum + (deal.value || 0), 0)
 
-        if (analyticsResult.success) {
-          setAnalytics(analyticsResult.data)
-        }
-
-        if (dealsResult.success) {
-          setRecentDeals(dealsResult.data || [])
-        }
-
-        if (tasksResult.success) {
-          setUpcomingTasks(tasksResult.data || [])
-        }
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error)
-      } finally {
-        setLoading(false)
+      return {
+        name: user.name,
+        deals: userDeals.length,
+        revenue: userRevenue,
+        target: 150000, // Default target, could be made configurable
       }
-    }
-
-    fetchDashboardData()
-  }, [])
+    })
+    .slice(0, 4) // Show top 4 team members
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -69,31 +90,22 @@ export default function Dashboard() {
   }
 
   const getStageColor = (stage: string) => {
-    switch (stage) {
-      case "Lead":
+    const stageKey = stage?.toLowerCase() || ""
+    switch (stageKey) {
+      case "lead":
         return "bg-blue-100 text-blue-800"
-      case "Qualified":
+      case "qualified":
         return "bg-green-100 text-green-800"
-      case "Proposal":
+      case "proposal":
         return "bg-yellow-100 text-yellow-800"
-      case "Negotiation":
+      case "negotiation":
         return "bg-orange-100 text-orange-800"
-      case "Closed Won":
+      case "closed-won":
+      case "closed won":
         return "bg-emerald-100 text-emerald-800"
       default:
         return "bg-gray-100 text-gray-800"
     }
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex items-center gap-2">
-          <Loader2 className="h-6 w-6 animate-spin" />
-          <span>Loading dashboard...</span>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -120,9 +132,9 @@ export default function Dashboard() {
             <DollarSign className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg md:text-2xl font-bold">${analytics?.revenue?.current?.toLocaleString() || "0"}</div>
+            <div className="text-lg md:text-2xl font-bold">${totalRevenue.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              <span className="text-green-600">+{analytics?.revenue?.growth || 0}%</span> from last month
+              <span className="text-green-600">From {closedWonDeals.length} deals</span>
             </p>
           </CardContent>
         </Card>
@@ -132,33 +144,33 @@ export default function Dashboard() {
             <Target className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg md:text-2xl font-bold">{analytics?.deals?.active || 0}</div>
+            <div className="text-lg md:text-2xl font-bold">{activeDeals.length}</div>
             <p className="text-xs text-muted-foreground">
-              <span className="text-green-600">+{analytics?.deals?.won || 0}</span> won this period
+              <span className="text-blue-600">{deals.length} total deals</span>
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium">Win Rate</CardTitle>
+            <CardTitle className="text-xs md:text-sm font-medium">Conversion Rate</CardTitle>
             <TrendingUp className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg md:text-2xl font-bold">{analytics?.deals?.winRate || 0}%</div>
+            <div className="text-lg md:text-2xl font-bold">{conversionRate.toFixed(1)}%</div>
             <p className="text-xs text-muted-foreground">
-              <span className="text-green-600">+4.2%</span> from last month
+              <span className="text-green-600">{closedWonDeals.length} won deals</span>
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium">Total Contacts</CardTitle>
+            <CardTitle className="text-xs md:text-sm font-medium">Team Members</CardTitle>
             <Users className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg md:text-2xl font-bold">{analytics?.contacts?.total || 0}</div>
+            <div className="text-lg md:text-2xl font-bold">{users.length}</div>
             <p className="text-xs text-muted-foreground">
-              <span className="text-blue-600">{analytics?.contacts?.new || 0}</span> new this month
+              <span className="text-blue-600">{contacts.length} contacts</span>
             </p>
           </CardContent>
         </Card>
@@ -199,55 +211,51 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="space-y-3 md:space-y-4">
             {recentDeals.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No recent deals found</p>
-                <p className="text-sm">Create your first deal to get started</p>
-              </div>
+              <p className="text-muted-foreground text-center py-4">No deals found</p>
             ) : (
               <>
-                {recentDeals.slice(0, 3).map((deal) => (
+                {recentDeals.map((deal) => (
                   <div key={deal.id} className="block md:hidden">
                     <Card className="p-3">
                       <div className="space-y-2">
                         <div className="flex items-start justify-between">
-                          <h4 className="font-medium text-sm truncate pr-2">{deal.title}</h4>
+                          <h4 className="font-medium text-sm truncate pr-2">{deal.name}</h4>
                           <Badge variant="secondary" className={`text-xs ${getStageColor(deal.stage)} shrink-0`}>
                             {deal.stage}
                           </Badge>
                         </div>
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span className="truncate">{deal.client || deal.company}</span>
-                          <span className="font-medium text-foreground">${(deal.value || 0).toLocaleString()}</span>
+                          <span className="truncate">{deal.company}</span>
+                          <span className="font-medium text-foreground">${deal.value.toLocaleString()}</span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">{deal.assignee}</span>
-                          <span className="text-xs text-green-600">{deal.probability || 0}%</span>
+                          <span className="text-xs text-muted-foreground">{deal.contact}</span>
+                          <span className="text-xs text-green-600">{deal.probability}%</span>
                         </div>
                       </div>
                     </Card>
                   </div>
                 ))}
                 <div className="hidden md:block space-y-4">
-                  {recentDeals.slice(0, 3).map((deal) => (
+                  {recentDeals.map((deal) => (
                     <div key={deal.id} className="flex items-center justify-between p-4 border rounded-lg">
                       <div className="space-y-1">
-                        <p className="font-medium">{deal.title}</p>
+                        <p className="font-medium">{deal.name}</p>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Building2 className="h-4 w-4" />
-                          <span>{deal.client || deal.company}</span>
+                          <span>{deal.company}</span>
                           <span>•</span>
                           <User className="h-4 w-4" />
-                          <span>{deal.assignee}</span>
+                          <span>{deal.contact}</span>
                         </div>
                       </div>
                       <div className="text-right space-y-1">
-                        <p className="font-medium">${(deal.value || 0).toLocaleString()}</p>
+                        <p className="font-medium">${deal.value.toLocaleString()}</p>
                         <div className="flex items-center gap-2">
                           <Badge variant="secondary" className={getStageColor(deal.stage)}>
                             {deal.stage}
                           </Badge>
-                          <span className="text-sm text-green-600">{deal.probability || 0}%</span>
+                          <span className="text-sm text-green-600">{deal.probability}%</span>
                         </div>
                       </div>
                     </div>
@@ -265,13 +273,9 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="space-y-3 md:space-y-4">
             {upcomingTasks.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No upcoming tasks</p>
-                <p className="text-sm">You're all caught up!</p>
-              </div>
+              <p className="text-muted-foreground text-center py-4">No upcoming tasks</p>
             ) : (
-              upcomingTasks.slice(0, 3).map((task) => (
+              upcomingTasks.map((task) => (
                 <div key={task.id} className="flex items-start gap-3 p-3 border rounded-lg">
                   <div className="mt-1">
                     <div
@@ -289,7 +293,7 @@ export default function Dashboard() {
                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
-                        <span>{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "No due date"}</span>
+                        <span>{task.dueDate}</span>
                       </div>
                       <span className="hidden sm:inline">•</span>
                       <div className="flex items-center gap-1">
@@ -297,7 +301,7 @@ export default function Dashboard() {
                         <span className="truncate">{task.assignee}</span>
                       </div>
                     </div>
-                    <p className="text-xs text-muted-foreground truncate">{task.client}</p>
+                    <p className="text-xs text-muted-foreground truncate">{task.company}</p>
                   </div>
                   <Badge variant="outline" className={`text-xs shrink-0 ${getPriorityColor(task.priority)}`}>
                     {task.priority}
@@ -310,15 +314,17 @@ export default function Dashboard() {
       </div>
 
       {/* Team Performance */}
-      {analytics?.team?.performance && analytics.team.performance.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base md:text-lg">Team Performance</CardTitle>
-            <CardDescription className="text-sm">Individual performance metrics</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4 md:space-y-6">
-              {analytics.team.performance.map((member: any, index: number) => (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base md:text-lg">Team Performance</CardTitle>
+          <CardDescription className="text-sm">Individual performance metrics</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4 md:space-y-6">
+            {teamPerformance.length === 0 ? (
+              <p className="text-muted-foreground text-center py-4">No team members found</p>
+            ) : (
+              teamPerformance.map((member, index) => (
                 <div key={index} className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -326,13 +332,13 @@ export default function Dashboard() {
                         <AvatarImage
                           src={`/placeholder-40x40.png?height=40&width=40&text=${member.name
                             .split(" ")
-                            .map((n: string) => n[0])
+                            .map((n) => n[0])
                             .join("")}`}
                         />
                         <AvatarFallback>
                           {member.name
                             .split(" ")
-                            .map((n: string) => n[0])
+                            .map((n) => n[0])
                             .join("")}
                         </AvatarFallback>
                       </Avatar>
@@ -348,11 +354,11 @@ export default function Dashboard() {
                   </div>
                   <Progress value={(member.revenue / member.target) * 100} className="h-2" />
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Activity Feed */}
       <Card>
