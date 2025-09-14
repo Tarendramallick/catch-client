@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
-import useSWR from "swr"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -69,6 +68,89 @@ const teamMembers = [
   { id: "4", name: "Alex Rodriguez", avatar: "/placeholder.svg?height=32&width=32" },
 ]
 
+const initialDeals = [
+  {
+    id: "d1",
+    title: "Enterprise Package",
+    company: "Acme Corp",
+    industry: "Technology",
+    description: "Enterprise software solution for 500+ employees with advanced analytics and reporting features",
+    value: 45000,
+    stage: "Proposal",
+    probability: 75,
+    closeDate: "2024-02-15",
+    assigneeId: "1",
+    assignee: "Sarah Johnson",
+    avatar: "/placeholder.svg?height=32&width=32",
+    lastUpdated: "2024-01-15",
+    createdDate: "2024-01-10",
+  },
+  {
+    id: "d2",
+    title: "Startup Plan",
+    company: "TechStart Inc",
+    industry: "Technology",
+    description: "Custom development and consulting services for growing startup",
+    value: 28500,
+    stage: "Negotiation",
+    probability: 90,
+    closeDate: "2024-02-10",
+    assigneeId: "2",
+    assignee: "Mike Chen",
+    avatar: "/placeholder.svg?height=32&width=32",
+    lastUpdated: "2024-01-14",
+    createdDate: "2024-01-08",
+  },
+  {
+    id: "d3",
+    title: "Integration Project",
+    company: "Global Solutions",
+    industry: "Consulting",
+    description: "System integration and migration project for multinational consulting firm",
+    value: 67200,
+    stage: "Qualified",
+    probability: 60,
+    closeDate: "2024-03-01",
+    assigneeId: "3",
+    assignee: "Emma Davis",
+    avatar: "/placeholder.svg?height=32&width=32",
+    lastUpdated: "2024-01-13",
+    createdDate: "2024-01-05",
+  },
+  {
+    id: "d4",
+    title: "Healthcare Solution",
+    company: "Innovation Labs",
+    industry: "Healthcare",
+    description: "Medical technology integration with compliance and security features",
+    value: 89000,
+    stage: "Lead",
+    probability: 25,
+    closeDate: "2024-03-15",
+    assigneeId: "4",
+    assignee: "Alex Rodriguez",
+    avatar: "/placeholder.svg?height=32&width=32",
+    lastUpdated: "2024-01-12",
+    createdDate: "2024-01-12",
+  },
+  {
+    id: "d5",
+    title: "E-commerce Platform",
+    company: "Future Systems",
+    industry: "Retail",
+    description: "Complete e-commerce platform with inventory management and analytics",
+    value: 125000,
+    stage: "Closed Won",
+    probability: 100,
+    closeDate: "2024-01-20",
+    assigneeId: "1",
+    assignee: "Sarah Johnson",
+    avatar: "/placeholder.svg?height=32&width=32",
+    lastUpdated: "2024-01-20",
+    createdDate: "2023-12-15",
+  },
+]
+
 const stages = ["Lead", "Qualified", "Proposal", "Negotiation", "Closed Won", "Closed Lost"]
 
 const getStageColor = (stage: string) => {
@@ -109,46 +191,19 @@ const getStageBadgeColor = (stage: string) => {
   }
 }
 
-const fetcher = (url: string) => {
-  console.log("[v0] Fetching from:", url)
-  return fetch(url).then((res) => {
-    console.log("[v0] Response status:", res.status)
-    if (!res.ok) {
-      throw new Error(`HTTP error! status: ${res.status}`)
-    }
-    return res.json()
-  })
-}
-
 export default function DealsPage() {
-  console.log("[v0] DealsPage component rendering...")
-
-  const {
-    data: deals = [],
-    error,
-    mutate,
-  } = useSWR("/api/deals", fetcher, {
-    onError: (error) => {
-      console.error("[v0] Deals SWR error:", error)
-    },
-    onSuccess: (data) => {
-      console.log("[v0] Deals loaded successfully:", data?.length || 0, "items")
-    },
-  })
-
-  const [draggedDeal, setDraggedDeal] = useState<string | null>(null)
-  const [dragOverStage, setDragOverStage] = useState<string | null>(null)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [stageFilter, setStageFilter] = useState("all")
-  const [sortBy, setSortBy] = useState("value")
+  const [deals, setDeals] = useState(initialDeals)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingDeal, setEditingDeal] = useState<string | null>(null)
+  const [draggedDeal, setDraggedDeal] = useState<string | null>(null)
+  const [dragOverStage, setDragOverStage] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
 
+  // Form state
   const [newDeal, setNewDeal] = useState({
     title: "",
     company: "",
-    industry: "",
+    industry: "Technology",
     description: "",
     value: "",
     stage: "Lead",
@@ -157,11 +212,25 @@ export default function DealsPage() {
     assigneeId: "1",
   })
 
+  // Load deals from localStorage on mount
+  useEffect(() => {
+    const savedDeals = localStorage.getItem("catchclients-deals")
+    if (savedDeals) {
+      setDeals(JSON.parse(savedDeals))
+    }
+  }, [])
+
+  // Save deals to localStorage whenever deals change
+  useEffect(() => {
+    localStorage.setItem("catchclients-deals", JSON.stringify(deals))
+    window.dispatchEvent(new Event("storage"))
+  }, [deals])
+
   const resetForm = () => {
     setNewDeal({
       title: "",
       company: "",
-      industry: "",
+      industry: "Technology",
       description: "",
       value: "",
       stage: "Lead",
@@ -172,7 +241,31 @@ export default function DealsPage() {
     setEditingDeal(null)
   }
 
-  const handleSaveDeal = async () => {
+  const openAddDealDialog = (stage?: string) => {
+    resetForm()
+    if (stage) {
+      setNewDeal((prev) => ({ ...prev, stage }))
+    }
+    setIsDialogOpen(true)
+  }
+
+  const openEditDealDialog = (deal: (typeof initialDeals)[0]) => {
+    setNewDeal({
+      title: deal.title,
+      company: deal.company,
+      industry: deal.industry,
+      description: deal.description,
+      value: deal.value.toString(),
+      stage: deal.stage,
+      probability: deal.probability.toString(),
+      closeDate: deal.closeDate,
+      assigneeId: deal.assigneeId,
+    })
+    setEditingDeal(deal.id)
+    setIsDialogOpen(true)
+  }
+
+  const handleSaveDeal = () => {
     if (!newDeal.title.trim() || !newDeal.company.trim() || !newDeal.value.trim()) {
       alert("Please fill in the title, company, and value fields.")
       return
@@ -180,93 +273,90 @@ export default function DealsPage() {
 
     const assignee = teamMembers.find((member) => member.id === newDeal.assigneeId)
 
-    const dealData = {
-      title: newDeal.title,
-      company: newDeal.company,
-      industry: newDeal.industry,
-      description: newDeal.description,
-      value: Number.parseInt(newDeal.value),
-      stage: newDeal.stage,
-      probability: Number.parseInt(newDeal.probability),
-      closeDate: newDeal.closeDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-      assigneeId: newDeal.assigneeId,
-      assignee: assignee?.name || "Unknown",
-      avatar: assignee?.avatar || "/placeholder.svg?height=32&width=32",
-    }
-
-    try {
-      if (editingDeal) {
-        await fetch(`/api/deals/${editingDeal}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(dealData),
-        })
-      } else {
-        await fetch("/api/deals", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(dealData),
-        })
+    if (editingDeal) {
+      setDeals(
+        deals.map((deal) =>
+          deal.id === editingDeal
+            ? {
+                ...deal,
+                title: newDeal.title,
+                company: newDeal.company,
+                industry: newDeal.industry,
+                description: newDeal.description,
+                value: Number.parseInt(newDeal.value),
+                stage: newDeal.stage,
+                probability: Number.parseInt(newDeal.probability),
+                closeDate: newDeal.closeDate,
+                assigneeId: newDeal.assigneeId,
+                assignee: assignee?.name || "Unknown",
+                avatar: assignee?.avatar || "/placeholder.svg?height=32&width=32",
+                lastUpdated: new Date().toISOString().split("T")[0],
+              }
+            : deal,
+        ),
+      )
+    } else {
+      const deal = {
+        id: `d${Date.now()}`,
+        title: newDeal.title,
+        company: newDeal.company,
+        industry: newDeal.industry,
+        description: newDeal.description,
+        value: Number.parseInt(newDeal.value),
+        stage: newDeal.stage,
+        probability: Number.parseInt(newDeal.probability),
+        closeDate: newDeal.closeDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+        assigneeId: newDeal.assigneeId,
+        assignee: assignee?.name || "Unknown",
+        avatar: assignee?.avatar || "/placeholder.svg?height=32&width=32",
+        lastUpdated: new Date().toISOString().split("T")[0],
+        createdDate: new Date().toISOString().split("T")[0],
       }
 
-      mutate() // Refresh data
-      setIsDialogOpen(false)
-      resetForm()
-    } catch (error) {
-      console.error("Error saving deal:", error)
-      alert("Failed to save deal")
+      setDeals([deal, ...deals])
     }
+
+    setIsDialogOpen(false)
+    resetForm()
   }
 
-  const deleteDeal = async (dealId: string) => {
+  const deleteDeal = (dealId: string) => {
     if (confirm("Are you sure you want to delete this deal?")) {
-      try {
-        await fetch(`/api/deals/${dealId}`, {
-          method: "DELETE",
-        })
-        mutate() // Refresh data
-      } catch (error) {
-        console.error("Error deleting deal:", error)
-        alert("Failed to delete deal")
-      }
+      setDeals(deals.filter((deal) => deal.id !== dealId))
     }
   }
 
-  const closeDealWon = async (dealId: string) => {
+  const closeDealWon = (dealId: string) => {
     if (confirm("Mark this deal as Closed Won?")) {
-      try {
-        await fetch(`/api/deals/${dealId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            stage: "Closed Won",
-            probability: 100,
-          }),
-        })
-        mutate() // Refresh data
-      } catch (error) {
-        console.error("Error updating deal:", error)
-        alert("Failed to update deal")
-      }
+      setDeals(
+        deals.map((deal) =>
+          deal.id === dealId
+            ? {
+                ...deal,
+                stage: "Closed Won",
+                probability: 100,
+                lastUpdated: new Date().toISOString().split("T")[0],
+              }
+            : deal,
+        ),
+      )
     }
   }
 
-  const closeDealLost = async (dealId: string) => {
+  const closeDealLost = (dealId: string) => {
     if (confirm("Mark this deal as Closed Lost?")) {
-      try {
-        await fetch(`/api/deals/${dealId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            stage: "Closed Lost",
-            probability: 0,
-          }),
-        })
-        mutate() // Refresh data
-      } catch (error) {
-        console.error("Error updating deal:", error)
-        alert("Failed to update deal")
-      }
+      setDeals(
+        deals.map((deal) =>
+          deal.id === dealId
+            ? {
+                ...deal,
+                stage: "Closed Lost",
+                probability: 0,
+                lastUpdated: new Date().toISOString().split("T")[0],
+              }
+            : deal,
+        ),
+      )
     }
   }
 
@@ -285,100 +375,34 @@ export default function DealsPage() {
     setDragOverStage(null)
   }
 
-  const handleDrop = async (e: React.DragEvent, targetStage: string) => {
+  const handleDrop = (e: React.DragEvent, targetStage: string) => {
     e.preventDefault()
     setDragOverStage(null)
 
     if (draggedDeal && targetStage !== "Closed Won" && targetStage !== "Closed Lost") {
-      try {
-        await fetch(`/api/deals/${draggedDeal}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            stage: targetStage,
-          }),
-        })
-        mutate() // Refresh data
-      } catch (error) {
-        console.error("Error updating deal stage:", error)
-      }
+      setDeals(
+        deals.map((deal) =>
+          deal.id === draggedDeal
+            ? {
+                ...deal,
+                stage: targetStage,
+                lastUpdated: new Date().toISOString().split("T")[0],
+              }
+            : deal,
+        ),
+      )
     }
     setDraggedDeal(null)
   }
 
-  const openAddDealDialog = (stage?: string) => {
-    setNewDeal({
-      title: "",
-      company: "",
-      industry: "",
-      description: "",
-      value: "",
-      stage: stage || "Lead",
-      probability: "25",
-      closeDate: "",
-      assigneeId: "1",
-    })
-    setIsDialogOpen(true)
-  }
+  // Calculate metrics
+  const activeDeals = deals.filter((deal) => !["Closed Won", "Closed Lost"].includes(deal.stage))
+  const closedWonDeals = deals.filter((deal) => deal.stage === "Closed Won")
+  const closedLostDeals = deals.filter((deal) => deal.stage === "Closed Lost")
 
-  const openEditDealDialog = (deal: any) => {
-    setNewDeal({
-      title: deal.title,
-      company: deal.company,
-      industry: deal.industry,
-      description: deal.description,
-      value: deal.value.toString(),
-      stage: deal.stage,
-      probability: deal.probability.toString(),
-      closeDate: deal.closeDate,
-      assigneeId: deal.assigneeId,
-    })
-    setEditingDeal(deal._id)
-    setIsDialogOpen(true)
-  }
-
-  if (error) {
-    console.error("[v0] Deals page error:", error)
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <h2 className="text-lg font-semibold mb-2">Failed to load deals</h2>
-          <p className="text-muted-foreground mb-4">Error: {error.message || "Unknown error"}</p>
-          <Button onClick={() => mutate()}>Try Again</Button>
-        </div>
-      </div>
-    )
-  }
-
-  if (!deals && !error) {
-    console.log("[v0] Deals still loading...")
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading deals...</p>
-        </div>
-      </div>
-    )
-  }
-
-  const activeDeals = Array.isArray(deals)
-    ? deals.filter((deal) => {
-        if (!deal) {
-          console.warn("[v0] Found null/undefined deal:", deal)
-          return false
-        }
-        return !["Closed Won", "Closed Lost"].includes(deal.stage)
-      })
-    : []
-
-  const closedWonDeals = Array.isArray(deals) ? deals.filter((deal) => deal && deal.stage === "Closed Won") : []
-
-  const closedLostDeals = Array.isArray(deals) ? deals.filter((deal) => deal && deal.stage === "Closed Lost") : []
-
-  const pipelineValue = activeDeals.reduce((sum, deal) => sum + (deal.value || 0), 0)
+  const pipelineValue = activeDeals.reduce((sum, deal) => sum + deal.value, 0)
   const averageDealSize = activeDeals.length > 0 ? pipelineValue / activeDeals.length : 0
-  const closedWonValue = closedWonDeals.reduce((sum, deal) => sum + (deal.value || 0), 0)
+  const closedWonValue = closedWonDeals.reduce((sum, deal) => sum + deal.value, 0)
   const winRate =
     closedWonDeals.length + closedLostDeals.length > 0
       ? (closedWonDeals.length / (closedWonDeals.length + closedLostDeals.length)) * 100
@@ -386,13 +410,11 @@ export default function DealsPage() {
 
   const dealsByStage = stages.reduce(
     (acc, stage) => {
-      acc[stage] = Array.isArray(deals) ? deals.filter((deal) => deal && deal.stage === stage) : []
+      acc[stage] = deals.filter((deal) => deal.stage === stage)
       return acc
     },
-    {} as Record<string, any>,
+    {} as Record<string, typeof deals>,
   )
-
-  console.log("[v0] Rendering deals page with", deals?.length || 0, "total deals")
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -522,12 +544,12 @@ export default function DealsPage() {
                     <CardContent className="space-y-3 max-h-96 overflow-y-auto">
                       {dealsByStage[stage]?.map((deal) => (
                         <Card
-                          key={deal._id}
+                          key={deal.id}
                           className={`cursor-move hover:shadow-md transition-all ${
-                            draggedDeal === deal._id ? "opacity-50 rotate-2" : ""
+                            draggedDeal === deal.id ? "opacity-50 rotate-2" : ""
                           }`}
                           draggable
-                          onDragStart={() => handleDragStart(deal._id)}
+                          onDragStart={() => handleDragStart(deal.id)}
                         >
                           <CardContent className="p-3">
                             <div className="flex items-start justify-between mb-2">
@@ -552,15 +574,15 @@ export default function DealsPage() {
                                     <Edit className="mr-2 h-4 w-4" />
                                     Edit Deal
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => closeDealWon(deal._id)}>
+                                  <DropdownMenuItem onClick={() => closeDealWon(deal.id)}>
                                     <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
                                     Close Won
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => closeDealLost(deal._id)}>
+                                  <DropdownMenuItem onClick={() => closeDealLost(deal.id)}>
                                     <XCircle className="mr-2 h-4 w-4 text-red-600" />
                                     Close Lost
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => deleteDeal(deal._id)} className="text-red-600">
+                                  <DropdownMenuItem onClick={() => deleteDeal(deal.id)} className="text-red-600">
                                     <Trash2 className="mr-2 h-4 w-4" />
                                     Delete Deal
                                   </DropdownMenuItem>
@@ -640,12 +662,12 @@ export default function DealsPage() {
                   <CardContent className="space-y-3 max-h-96 overflow-y-auto">
                     {dealsByStage[stage]?.map((deal) => (
                       <Card
-                        key={deal._id}
+                        key={deal.id}
                         className={`cursor-move hover:shadow-md transition-all ${
-                          draggedDeal === deal._id ? "opacity-50 rotate-2" : ""
+                          draggedDeal === deal.id ? "opacity-50 rotate-2" : ""
                         }`}
                         draggable
-                        onDragStart={() => handleDragStart(deal._id)}
+                        onDragStart={() => handleDragStart(deal.id)}
                       >
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between mb-2">
@@ -672,15 +694,15 @@ export default function DealsPage() {
                                     <Edit className="mr-2 h-4 w-4" />
                                     Edit Deal
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => closeDealWon(deal._id)}>
+                                  <DropdownMenuItem onClick={() => closeDealWon(deal.id)}>
                                     <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
                                     Close Won
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => closeDealLost(deal._id)}>
+                                  <DropdownMenuItem onClick={() => closeDealLost(deal.id)}>
                                     <XCircle className="mr-2 h-4 w-4 text-red-600" />
                                     Close Lost
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => deleteDeal(deal._id)} className="text-red-600">
+                                  <DropdownMenuItem onClick={() => deleteDeal(deal.id)} className="text-red-600">
                                     <Trash2 className="mr-2 h-4 w-4" />
                                     Delete Deal
                                   </DropdownMenuItem>
@@ -746,7 +768,7 @@ export default function DealsPage() {
           </CardHeader>
           <CardContent className="space-y-3 max-h-64 overflow-y-auto">
             {dealsByStage["Closed Won"]?.map((deal) => (
-              <Card key={deal._id}>
+              <Card key={deal.id}>
                 <CardContent className="p-3 md:p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
@@ -770,7 +792,7 @@ export default function DealsPage() {
                           <Edit className="mr-2 h-4 w-4" />
                           Edit Deal
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => deleteDeal(deal._id)} className="text-red-600">
+                        <DropdownMenuItem onClick={() => deleteDeal(deal.id)} className="text-red-600">
                           <Trash2 className="mr-2 h-4 w-4" />
                           Delete Deal
                         </DropdownMenuItem>
@@ -812,7 +834,7 @@ export default function DealsPage() {
           </CardHeader>
           <CardContent className="space-y-3 max-h-64 overflow-y-auto">
             {dealsByStage["Closed Lost"]?.map((deal) => (
-              <Card key={deal._id}>
+              <Card key={deal.id}>
                 <CardContent className="p-3 md:p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
@@ -836,7 +858,7 @@ export default function DealsPage() {
                           <Edit className="mr-2 h-4 w-4" />
                           Edit Deal
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => deleteDeal(deal._id)} className="text-red-600">
+                        <DropdownMenuItem onClick={() => deleteDeal(deal.id)} className="text-red-600">
                           <Trash2 className="mr-2 h-4 w-4" />
                           Delete Deal
                         </DropdownMenuItem>
