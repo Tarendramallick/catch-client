@@ -34,6 +34,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
+import { deals } from "@/lib/crm-data"
 
 // Define the base menu items (Default Dashboard Options)
 const defaultMenuItems = [
@@ -79,6 +80,11 @@ const defaultMenuItems = [
         title: "People",
         url: "/contacts",
         icon: Users,
+      },
+      {
+        title: "Deals",
+        url: "/deals",
+        icon: deals,
       },
     ],
   },
