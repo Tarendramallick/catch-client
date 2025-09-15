@@ -33,6 +33,13 @@ import {
   CheckCircle,
   XCircle,
   GripVertical,
+  Search,
+  Filter,
+  SortAsc,
+  BarChart3,
+  List,
+  Kanban,
+  User,
 } from "lucide-react"
 import { DealsStageChart } from "@/components/deals-stage-chart"
 import { ClosedWonChart } from "@/components/closed-won-chart"
@@ -70,6 +77,15 @@ const teamMembers = [
 ]
 
 const stages = ["Lead", "Qualified", "Proposal", "Negotiation", "Closed Won", "Closed Lost"]
+
+const stageColors = {
+  Lead: "bg-gray-100 text-gray-800",
+  Qualified: "bg-blue-100 text-blue-800",
+  Proposal: "bg-yellow-100 text-yellow-800",
+  Negotiation: "bg-orange-100 text-orange-800",
+  "Closed Won": "bg-green-100 text-green-800",
+  "Closed Lost": "bg-red-100 text-red-800",
+}
 
 const getStageColor = (stage: string) => {
   switch (stage) {
@@ -142,11 +158,12 @@ export default function DealsPage() {
   const [draggedDeal, setDraggedDeal] = useState<string | null>(null)
   const [dragOverStage, setDragOverStage] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
+  const [filterStage, setFilterStage] = useState("all")
+  const [sortBy, setSortBy] = useState("createdAt")
   const [stageFilter, setStageFilter] = useState("all")
-  const [sortBy, setSortBy] = useState("value")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingDeal, setEditingDeal] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
+  const [viewMode, setViewMode] = useState<"kanban" | "list" | "charts">("kanban")
 
   const [newDeal, setNewDeal] = useState({
     title: "",
@@ -430,6 +447,26 @@ export default function DealsPage() {
     {} as Record<string, any>,
   )
 
+  const filteredAndSortedDeals = deals
+    .filter((deal: any) => {
+      const matchesSearch =
+        deal.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        deal.company.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesStage = filterStage === "all" || deal.stage === filterStage
+      return matchesSearch && matchesStage
+    })
+    .sort((a: any, b: any) => {
+      switch (sortBy) {
+        case "value":
+          return b.value - a.value
+        case "stage":
+          return a.stage.localeCompare(b.stage)
+        case "createdAt":
+        default:
+          return new Date(b.createdAt || "").getTime() - new Date(a.createdAt || "").getTime()
+      }
+    })
+
   console.log("[v0] Rendering deals page with", deals?.length || 0, "total deals")
 
   return (
@@ -443,22 +480,23 @@ export default function DealsPage() {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
-          <div className="flex rounded-lg border p-1 bg-muted">
+          <div className="flex items-center space-x-1 bg-muted rounded-lg p-1">
             <Button
               variant={viewMode === "kanban" ? "default" : "ghost"}
               size="sm"
               onClick={() => setViewMode("kanban")}
-              className="h-7 px-3"
             >
-              Kanban
+              <Kanban className="h-4 w-4" />
+            </Button>
+            <Button variant={viewMode === "list" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("list")}>
+              <List className="h-4 w-4" />
             </Button>
             <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
+              variant={viewMode === "charts" ? "default" : "ghost"}
               size="sm"
-              onClick={() => setViewMode("list")}
-              className="h-7 px-3"
+              onClick={() => setViewMode("charts")}
             >
-              List
+              <BarChart3 className="h-4 w-4" />
             </Button>
           </div>
           <Button onClick={() => openAddDealDialog()} className="w-full sm:w-auto">
@@ -517,15 +555,15 @@ export default function DealsPage() {
         </Card>
       </div>
 
-      {/* Mobile-responsive Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-        <DealsStageChart deals={deals} />
-        <ClosedWonChart deals={deals} />
-      </div>
-
-      {/* Pipeline Stages - Mobile Responsive */}
       {viewMode === "kanban" && (
         <>
+          {/* Charts in Kanban View */}
+          <div className="grid gap-4 md:grid-cols-2 mb-6">
+            <DealsStageChart deals={deals} />
+            <ClosedWonChart deals={deals} />
+          </div>
+
+          {/* Pipeline Stages - Mobile Responsive */}
           {/* Mobile: Horizontal scroll for pipeline stages */}
           <div className="block lg:hidden">
             <div className="flex gap-4 overflow-x-auto pb-4">
@@ -779,6 +817,109 @@ export default function DealsPage() {
         </>
       )}
 
+      {viewMode === "list" && (
+        <>
+          {/* Filters and Search */}
+          <div className="flex items-center space-x-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search deals..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+            </div>
+            <Select value={filterStage} onValueChange={setFilterStage}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="mr-2 h-4 w-4" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Stages</SelectItem>
+                {stages.map((stage) => (
+                  <SelectItem key={stage} value={stage}>
+                    {stage}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-[180px]">
+                <SortAsc className="mr-2 h-4 w-4" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="createdAt">Date Created</SelectItem>
+                <SelectItem value="value">Deal Value</SelectItem>
+                <SelectItem value="stage">Stage</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Deals Grid */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filteredAndSortedDeals.map((deal: any) => (
+              <Card key={deal._id || deal.id} className="cursor-pointer hover:shadow-md transition-shadow">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">{deal.title}</CardTitle>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="h-8 w-8 p-0">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openEditDealDialog(deal)}>Edit</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => deleteDeal(deal._id || deal.id || "")} className="text-red-600">
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Building2 className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">{deal.company}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">${deal.value.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">{deal.assignedTo}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        {new Date(deal.expectedCloseDate).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Badge className={stageColors[deal.stage as keyof typeof stageColors]}>{deal.stage}</Badge>
+                      <span className="text-sm font-medium">{deal.probability}%</span>
+                    </div>
+                    {deal.description && (
+                      <p className="text-sm text-muted-foreground line-clamp-2">{deal.description}</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {filteredAndSortedDeals.length === 0 && (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No deals found matching your criteria.</p>
+            </div>
+          )}
+        </>
+      )}
+
       {/* Closed Deals - Mobile Responsive */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Closed Won */}
@@ -832,12 +973,7 @@ export default function DealsPage() {
                       <Avatar className="h-6 w-6">
                         <AvatarImage src={deal.avatar || "/placeholder.svg"} />
                         <AvatarFallback className="text-xs">
-                          {deal.assignedTo
-                            ? deal.assignedTo
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")
-                            : "?"}
+                          {deal.assignedTo ? deal.assignedTo.split(" ").map((n) => n[0]) : "?"}
                         </AvatarFallback>
                       </Avatar>
                       <span className="text-xs text-muted-foreground">{deal.assignedTo}</span>
@@ -900,12 +1036,7 @@ export default function DealsPage() {
                       <Avatar className="h-6 w-6">
                         <AvatarImage src={deal.avatar || "/placeholder.svg"} />
                         <AvatarFallback className="text-xs">
-                          {deal.assignedTo
-                            ? deal.assignedTo
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")
-                            : "?"}
+                          {deal.assignedTo ? deal.assignedTo.split(" ").map((n) => n[0]) : "?"}
                         </AvatarFallback>
                       </Avatar>
                       <span className="text-xs text-muted-foreground">{deal.assignedTo}</span>
@@ -1010,11 +1141,11 @@ export default function DealsPage() {
                   onValueChange={(value) => setNewDeal({ ...newDeal, assignedTo: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select user" />
+                    <SelectValue placeholder="Select team member" />
                   </SelectTrigger>
                   <SelectContent>
                     {users.map((user: any) => (
-                      <SelectItem key={user._id || user.id} value={user.name}>
+                      <SelectItem key={user._id || user.id} value={user._id || user.id}>
                         {user.name}
                       </SelectItem>
                     ))}
@@ -1048,12 +1179,12 @@ export default function DealsPage() {
               />
             </div>
           </div>
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="w-full sm:w-auto">
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveDeal} className="w-full sm:w-auto">
-              {editingDeal ? "Update Deal" : "Add Deal"}
+            <Button type="button" onClick={handleSaveDeal}>
+              {editingDeal ? "Update Deal" : "Create Deal"}
             </Button>
           </DialogFooter>
         </DialogContent>
