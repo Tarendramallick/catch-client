@@ -624,13 +624,15 @@ export default function DealsPage() {
                               </div>
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-2">
-                                  <Avatar className="h-5 w-5">
+                                  <Avatar className="h-6 w-6">
                                     <AvatarImage src={deal.avatar || "/placeholder.svg"} />
                                     <AvatarFallback className="text-xs">
                                       {deal.assignedTo
-                                        .split(" ")
-                                        .map((n) => n[0])
-                                        .join("")}
+                                        ? deal.assignedTo
+                                            .split(" ")
+                                            .map((n) => n[0])
+                                            .join("")
+                                        : "?"}
                                     </AvatarFallback>
                                   </Avatar>
                                   <span className="text-xs text-muted-foreground">{deal.assignedTo}</span>
@@ -748,13 +750,15 @@ export default function DealsPage() {
                             </div>
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-2">
-                                <Avatar className="h-5 w-5">
+                                <Avatar className="h-6 w-6">
                                   <AvatarImage src={deal.avatar || "/placeholder.svg"} />
                                   <AvatarFallback className="text-xs">
                                     {deal.assignedTo
-                                      .split(" ")
-                                      .map((n) => n[0])
-                                      .join("")}
+                                      ? deal.assignedTo
+                                          .split(" ")
+                                          .map((n) => n[0])
+                                          .join("")
+                                      : "?"}
                                   </AvatarFallback>
                                 </Avatar>
                                 <span className="text-xs text-muted-foreground">{deal.assignedTo}</span>
@@ -825,13 +829,15 @@ export default function DealsPage() {
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-green-600">${deal.value.toLocaleString()}</span>
                     <div className="flex items-center space-x-2">
-                      <Avatar className="h-5 w-5">
+                      <Avatar className="h-6 w-6">
                         <AvatarImage src={deal.avatar || "/placeholder.svg"} />
                         <AvatarFallback className="text-xs">
                           {deal.assignedTo
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
+                            ? deal.assignedTo
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")
+                            : "?"}
                         </AvatarFallback>
                       </Avatar>
                       <span className="text-xs text-muted-foreground">{deal.assignedTo}</span>
@@ -891,13 +897,15 @@ export default function DealsPage() {
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-red-600">${deal.value.toLocaleString()}</span>
                     <div className="flex items-center space-x-2">
-                      <Avatar className="h-5 w-5">
+                      <Avatar className="h-6 w-6">
                         <AvatarImage src={deal.avatar || "/placeholder.svg"} />
                         <AvatarFallback className="text-xs">
                           {deal.assignedTo
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
+                            ? deal.assignedTo
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")
+                            : "?"}
                         </AvatarFallback>
                       </Avatar>
                       <span className="text-xs text-muted-foreground">{deal.assignedTo}</span>
