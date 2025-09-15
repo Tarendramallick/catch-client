@@ -1,12 +1,13 @@
 "use client"
-
 import { useState } from "react"
+import useSWR from "swr"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
@@ -15,711 +16,910 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Plus,
   MoreHorizontal,
-  DollarSign,
-  Calendar,
-  User,
   Building2,
+  Users,
+  DollarSign,
+  TrendingUp,
   Search,
   Filter,
-  SortAsc,
-  BarChart3,
-  List,
-  Kanban,
+  ArrowUpDown,
+  Globe,
+  Eye,
+  Edit,
+  ExternalLink,
+  Linkedin,
+  Trash2,
+  MessageSquare,
+  Activity,
 } from "lucide-react"
-import { DealsStageChart } from "@/components/deals-stage-chart"
-import { ClosedWonChart } from "@/components/closed-won-chart"
-import useSWR from "swr"
-import type React from "react"
 
-const fetcher = async (url: string) => {
-  const res = await fetch(url)
-  if (!res.ok) throw new Error("Failed to fetch")
-  const data = await res.json()
-  return data.data || data
+const fetcher = (url: string) => {
+  return fetch(url).then((res) => {
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`)
+    }
+    return res.json().then((data) => data.data || data)
+  })
 }
 
-interface Deal {
-  _id?: string
-  id?: string
-  title: string
-  company: string
-  value: number
-  stage: string
-  probability: number
-  expectedCloseDate: string
-  assignedTo: string
-  description: string
-  tags: string[]
-  createdAt?: string
-  updatedAt?: string
-}
+const industryCategories = [
+  "Technology",
+  "Healthcare",
+  "Finance",
+  "Manufacturing",
+  "Retail",
+  "Education",
+  "Real Estate",
+  "Consulting",
+  "Media",
+  "Transportation",
+  "Energy",
+  "Agriculture",
+  "Construction",
+  "Entertainment",
+  "Food & Beverage",
+  "Government",
+  "Insurance",
+  "Legal",
+  "Non-profit",
+  "Pharmaceutical",
+  "Telecommunications",
+  "Other",
+]
 
-const stages = ["Lead", "Qualified", "Proposal", "Negotiation", "Closed Won", "Closed Lost"]
+const statusOptions = ["Prospect", "Lead", "Qualified", "Active Customer", "Partner", "Inactive"]
 
-const stageColors = {
-  Lead: "bg-gray-100 text-gray-800",
-  Qualified: "bg-blue-100 text-blue-800",
-  Proposal: "bg-yellow-100 text-yellow-800",
-  Negotiation: "bg-orange-100 text-orange-800",
-  "Closed Won": "bg-green-100 text-green-800",
-  "Closed Lost": "bg-red-100 text-red-800",
-}
-
-const getStageColor = (stage: string) => {
-  switch (stage) {
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case "Prospect":
+      return "bg-gray-100 text-gray-800"
     case "Lead":
-      return "bg-gray-100 border-gray-200 dark:bg-gray-800 dark:border-gray-700"
+      return "bg-blue-100 text-blue-800"
     case "Qualified":
-      return "bg-blue-100 border-blue-200 dark:bg-blue-900 dark:border-blue-700"
-    case "Proposal":
-      return "bg-yellow-100 border-yellow-200 dark:bg-yellow-900 dark:border-yellow-700"
-    case "Negotiation":
-      return "bg-orange-100 border-orange-200 dark:bg-orange-900 dark:border-orange-700"
-    case "Closed Won":
-      return "bg-green-100 border-green-200 dark:bg-green-900 dark:border-green-700"
-    case "Closed Lost":
-      return "bg-red-100 border-red-200 dark:bg-red-900 dark:border-red-700"
+      return "bg-yellow-100 text-yellow-800"
+    case "Active Customer":
+      return "bg-green-100 text-green-800"
+    case "Partner":
+      return "bg-purple-100 text-purple-800"
+    case "Inactive":
+      return "bg-red-100 text-red-800"
     default:
-      return "bg-gray-100 border-gray-200 dark:bg-gray-800 dark:border-gray-700"
+      return "bg-gray-100 text-gray-800"
   }
 }
 
-export default function DealsPage() {
-  const { data: deals = [], error, mutate } = useSWR("/api/deals", fetcher)
-  const { data: users = [] } = useSWR("/api/users", fetcher)
-  const { data: companies = [] } = useSWR("/api/companies", fetcher)
+const getActivityIcon = (type: string) => {
+  switch (type) {
+    case "company":
+      return <Building2 className="h-4 w-4 text-blue-500" />
+    case "note":
+      return <MessageSquare className="h-4 w-4 text-green-500" />
+    case "activity":
+      return <Activity className="h-4 w-4 text-orange-500" />
+    default:
+      return <Activity className="h-4 w-4 text-gray-500" />
+  }
+}
+
+export default function CompaniesPage() {
+  const { data: companies = [], error, mutate } = useSWR("/api/companies", fetcher)
+  const { data: notes = [] } = useSWR("/api/notes", fetcher)
 
   const [searchTerm, setSearchTerm] = useState("")
-  const [filterStage, setFilterStage] = useState("all")
-  const [sortBy, setSortBy] = useState("createdAt")
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [industryFilter, setIndustryFilter] = useState("all")
+  const [sortBy, setSortBy] = useState("name")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingDeal, setEditingDeal] = useState<Deal | null>(null)
-  const [formData, setFormData] = useState<Partial<Deal>>({
-    title: "",
-    company: "",
-    value: 0,
-    stage: "Lead",
-    probability: 0,
-    expectedCloseDate: "",
-    assignedTo: "",
+  const [editingCompany, setEditingCompany] = useState<string | null>(null)
+  const [selectedCompany, setSelectedCompany] = useState<string | null>(null)
+
+  const [newCompany, setNewCompany] = useState({
+    name: "",
+    industry: "Technology",
+    estimatedARR: "",
+    linkedinUrl: "",
+    domain: "",
     description: "",
-    tags: [],
+    employees: "",
+    location: "",
+    foundedYear: "",
+    status: "Prospect",
   })
-  const [draggedDeal, setDraggedDeal] = useState<string | null>(null)
-  const [dragOverStage, setDragOverStage] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<"kanban" | "list" | "charts">("kanban")
 
-  const handleDragStart = (e: React.DragEvent, dealId: string) => {
-    setDraggedDeal(dealId)
-    e.dataTransfer.effectAllowed = "move"
-  }
-
-  const handleDragOver = (e: React.DragEvent, stage: string) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = "move"
-    setDragOverStage(stage)
-  }
-
-  const handleDragLeave = () => {
-    setDragOverStage(null)
-  }
-
-  const handleDrop = async (e: React.DragEvent, targetStage: string) => {
-    e.preventDefault()
-    setDragOverStage(null)
-
-    if (draggedDeal && targetStage !== draggedDeal) {
-      try {
-        const response = await fetch(`/api/deals/${draggedDeal}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ stage: targetStage }),
-        })
-
-        if (!response.ok) throw new Error("Failed to update deal stage")
-
-        // Refresh data
-        mutate()
-      } catch (error) {
-        console.error("Error updating deal stage:", error)
-      }
-    }
-    setDraggedDeal(null)
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    try {
-      if (editingDeal) {
-        // Update existing deal
-        const response = await fetch(`/api/deals/${editingDeal._id || editingDeal.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
-        })
-
-        if (!response.ok) throw new Error("Failed to update deal")
-      } else {
-        // Create new deal
-        const response = await fetch("/api/deals", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...formData,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          }),
-        })
-
-        if (!response.ok) throw new Error("Failed to create deal")
-      }
-
-      // Refresh data
-      mutate()
-
-      // Reset form
-      setFormData({
-        title: "",
-        company: "",
-        value: 0,
-        stage: "Lead",
-        probability: 0,
-        expectedCloseDate: "",
-        assignedTo: "",
-        description: "",
-        tags: [],
-      })
-      setEditingDeal(null)
-      setIsDialogOpen(false)
-    } catch (error) {
-      console.error("Error saving deal:", error)
-      alert("Failed to save deal")
-    }
-  }
-
-  const handleDelete = async (dealId: string) => {
-    if (!confirm("Are you sure you want to delete this deal?")) return
-
-    try {
-      const response = await fetch(`/api/deals/${dealId}`, {
-        method: "DELETE",
-      })
-
-      if (!response.ok) throw new Error("Failed to delete deal")
-
-      // Refresh data
-      mutate()
-    } catch (error) {
-      console.error("Error deleting deal:", error)
-      alert("Failed to delete deal")
-    }
-  }
-
-  const handleEdit = (deal: Deal) => {
-    setEditingDeal(deal)
-    setFormData({
-      title: deal.title,
-      company: deal.company,
-      value: deal.value,
-      stage: deal.stage,
-      probability: deal.probability,
-      expectedCloseDate: deal.expectedCloseDate,
-      assignedTo: deal.assignedTo,
-      description: deal.description,
-      tags: deal.tags,
+  const resetForm = () => {
+    setNewCompany({
+      name: "",
+      industry: "Technology",
+      estimatedARR: "",
+      linkedinUrl: "",
+      domain: "",
+      description: "",
+      employees: "",
+      location: "",
+      foundedYear: "",
+      status: "Prospect",
     })
+    setEditingCompany(null)
+  }
+
+  const openAddCompanyDialog = () => {
+    resetForm()
     setIsDialogOpen(true)
   }
 
-  // Calculate metrics
-  const activeDeals = deals.filter((deal: any) => !["Closed Won", "Closed Lost"].includes(deal.stage))
-  const closedWonDeals = deals.filter((deal: any) => deal.stage === "Closed Won")
-  const closedLostDeals = deals.filter((deal: any) => deal.stage === "Closed Lost")
-
-  const pipelineValue = activeDeals.reduce((sum: any, deal: any) => sum + deal.value, 0)
-  const averageDealSize = activeDeals.length > 0 ? pipelineValue / activeDeals.length : 0
-  const closedWonValue = closedWonDeals.reduce((sum: any, deal: any) => sum + deal.value, 0)
-  const winRate =
-    closedWonDeals.length + closedLostDeals.length > 0
-      ? (closedWonDeals.length / (closedWonDeals.length + closedLostDeals.length)) * 100
-      : 0
-
-  const dealsByStage = stages.reduce(
-    (acc, stage) => {
-      acc[stage] = deals.filter((deal: any) => deal.stage === stage)
-      return acc
-    },
-    {} as Record<string, typeof deals>,
-  )
-
-  const filteredAndSortedDeals = deals
-    .filter((deal: Deal) => {
-      const matchesSearch =
-        deal.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        deal.company.toLowerCase().includes(searchTerm.toLowerCase())
-      const matchesStage = filterStage === "all" || deal.stage === filterStage
-      return matchesSearch && matchesStage
+  const openEditCompanyDialog = (company: any) => {
+    setNewCompany({
+      name: company.name,
+      industry: company.industry,
+      estimatedARR: company.estimatedARR.toString(),
+      linkedinUrl: company.linkedinUrl || "",
+      domain: company.domain || "",
+      description: company.description || "",
+      employees: company.employees?.toString() || "",
+      location: company.location || "",
+      foundedYear: company.foundedYear?.toString() || "",
+      status: company.status,
     })
-    .sort((a: Deal, b: Deal) => {
+    setEditingCompany(company._id || company.id)
+    setIsDialogOpen(true)
+  }
+
+  const handleSaveCompany = async () => {
+    if (!newCompany.name.trim()) {
+      alert("Please enter a company name.")
+      return
+    }
+
+    const companyData = {
+      name: newCompany.name,
+      industry: newCompany.industry,
+      estimatedARR: Number.parseInt(newCompany.estimatedARR) || 0,
+      linkedinUrl: newCompany.linkedinUrl,
+      domain: newCompany.domain,
+      description: newCompany.description,
+      employees: Number.parseInt(newCompany.employees) || 0,
+      location: newCompany.location,
+      foundedYear: Number.parseInt(newCompany.foundedYear) || new Date().getFullYear(),
+      status: newCompany.status,
+    }
+
+    try {
+      let response
+      if (editingCompany) {
+        response = await fetch(`/api/companies/${editingCompany}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(companyData),
+        })
+      } else {
+        response = await fetch("/api/companies", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(companyData),
+        })
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to save company")
+      }
+
+      console.log("Company saved successfully")
+      mutate() // Refresh data
+      setIsDialogOpen(false)
+      resetForm()
+    } catch (error) {
+      console.error("Error saving company:", error)
+      alert("Failed to save company")
+    }
+  }
+
+  const deleteCompany = async (companyId: string) => {
+    if (confirm("Are you sure you want to delete this company?")) {
+      try {
+        const response = await fetch(`/api/companies/${companyId}`, {
+          method: "DELETE",
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || "Failed to delete company")
+        }
+
+        console.log("Company deleted successfully")
+        mutate() // Refresh data
+      } catch (error) {
+        console.error("Error deleting company:", error)
+        alert("Failed to delete company")
+      }
+    }
+  }
+
+  const sortCompanies = (companiesToSort: any[]) => {
+    return [...companiesToSort].sort((a, b) => {
       switch (sortBy) {
-        case "value":
-          return b.value - a.value
-        case "stage":
-          return a.stage.localeCompare(b.stage)
-        case "createdAt":
+        case "name":
+          return a.name.localeCompare(b.name)
+        case "industry":
+          return a.industry.localeCompare(b.industry)
+        case "arr":
+          return b.estimatedARR - a.estimatedARR
+        case "employees":
+          return (b.employees || 0) - (a.employees || 0)
+        case "lastActivity":
+          return (
+            new Date(b.updatedAt || b.createdAt || "").getTime() - new Date(a.updatedAt || a.createdAt || "").getTime()
+          )
         default:
-          return new Date(b.createdAt || "").getTime() - new Date(a.createdAt || "").getTime()
+          return 0
       }
     })
+  }
 
-  if (error) return <div>Failed to load deals</div>
-  if (!deals) return <div>Loading...</div>
+  const filteredCompanies = companies.filter((company: any) => {
+    const matchesSearch =
+      company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (company.domain && company.domain.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (company.description && company.description.toLowerCase().includes(searchTerm.toLowerCase()))
+
+    const matchesStatus = statusFilter === "all" || company.status === statusFilter
+    const matchesIndustry = industryFilter === "all" || company.industry === industryFilter
+
+    return matchesSearch && matchesStatus && matchesIndustry
+  })
+
+  const sortedCompanies = sortCompanies(filteredCompanies)
+  const selectedCompanyData = companies.find((c: any) => (c._id || c.id) === selectedCompany)
+
+  // Get notes for selected company
+  const companyNotes = selectedCompanyData
+    ? notes.filter(
+        (note: any) =>
+          note.type === "company" && (note.companyId === selectedCompany || note.company === selectedCompanyData.name),
+      )
+    : []
+
+  const totalARR = companies.reduce((sum: number, company: any) => sum + (company.estimatedARR || 0), 0)
+  const activeCustomers = companies.filter((c: any) => c.status === "Active Customer").length
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <h2 className="text-lg font-semibold mb-2">Failed to load companies</h2>
+          <p className="text-muted-foreground mb-4">Error: {error.message || "Unknown error"}</p>
+          <Button onClick={() => mutate()}>Try Again</Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!companies && !error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading companies...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">Deals Pipeline</h2>
-        <div className="flex items-center space-x-2">
-          <div className="flex items-center space-x-1 bg-muted rounded-lg p-1">
-            <Button
-              variant={viewMode === "kanban" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("kanban")}
-            >
-              <Kanban className="h-4 w-4" />
-            </Button>
-            <Button variant={viewMode === "list" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("list")}>
-              <List className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === "charts" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("charts")}
-            >
-              <BarChart3 className="h-4 w-4" />
-            </Button>
-          </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button
-                onClick={() => {
-                  setEditingDeal(null)
-                  setFormData({
-                    title: "",
-                    company: "",
-                    value: 0,
-                    stage: "Lead",
-                    probability: 0,
-                    expectedCloseDate: "",
-                    assignedTo: "",
-                    description: "",
-                    tags: [],
-                  })
-                }}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Deal
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>{editingDeal ? "Edit Deal" : "Add New Deal"}</DialogTitle>
-                <DialogDescription>
-                  {editingDeal ? "Update the deal information." : "Create a new deal opportunity."}
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit}>
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="title" className="text-right">
-                      Title
-                    </Label>
-                    <Input
-                      id="title"
-                      value={formData.title}
-                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                      className="col-span-3"
-                      required
-                    />
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="company" className="text-right">
-                      Company
-                    </Label>
-                    <Select
-                      value={formData.company}
-                      onValueChange={(value) => setFormData({ ...formData, company: value })}
-                    >
-                      <SelectTrigger className="col-span-3">
-                        <SelectValue placeholder="Select company" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {companies.map((company: any) => (
-                          <SelectItem key={company._id || company.id} value={company.name}>
-                            {company.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="value" className="text-right">
-                      Value ($)
-                    </Label>
-                    <Input
-                      id="value"
-                      type="number"
-                      value={formData.value}
-                      onChange={(e) => setFormData({ ...formData, value: Number(e.target.value) })}
-                      className="col-span-3"
-                      required
-                    />
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="stage" className="text-right">
-                      Stage
-                    </Label>
-                    <Select
-                      value={formData.stage}
-                      onValueChange={(value) => setFormData({ ...formData, stage: value })}
-                    >
-                      <SelectTrigger className="col-span-3">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {stages.map((stage) => (
-                          <SelectItem key={stage} value={stage}>
-                            {stage}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="probability" className="text-right">
-                      Probability (%)
-                    </Label>
-                    <Input
-                      id="probability"
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={formData.probability}
-                      onChange={(e) => setFormData({ ...formData, probability: Number(e.target.value) })}
-                      className="col-span-3"
-                      required
-                    />
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="expectedCloseDate" className="text-right">
-                      Expected Close
-                    </Label>
-                    <Input
-                      id="expectedCloseDate"
-                      type="date"
-                      value={formData.expectedCloseDate}
-                      onChange={(e) => setFormData({ ...formData, expectedCloseDate: e.target.value })}
-                      className="col-span-3"
-                      required
-                    />
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="assignedTo" className="text-right">
-                      Assigned To
-                    </Label>
-                    <Select
-                      value={formData.assignedTo}
-                      onValueChange={(value) => setFormData({ ...formData, assignedTo: value })}
-                    >
-                      <SelectTrigger className="col-span-3">
-                        <SelectValue placeholder="Select user" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {users.map((user: any) => (
-                          <SelectItem key={user._id || user.id} value={user.name}>
-                            {user.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="description" className="text-right">
-                      Description
-                    </Label>
-                    <Textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      className="col-span-3"
-                      rows={3}
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button type="submit">{editingDeal ? "Update Deal" : "Create Deal"}</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+    <div className="space-y-4 md:space-y-6">
+      {/* Mobile-optimized header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Companies Dashboard</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Manage company profiles, track ARR, and monitor business relationships
+          </p>
         </div>
+        <Button onClick={openAddCompanyDialog} className="w-full sm:w-auto">
+          <Plus className="mr-2 h-4 w-4" />
+          Add Company
+        </Button>
       </div>
 
-      {/* Pipeline Metrics */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pipeline Value</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+      {/* Mobile-responsive Quick Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <Card className="p-3 md:p-6">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
+            <CardTitle className="text-xs md:text-sm font-medium">Total Companies</CardTitle>
+            <Building2 className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${pipelineValue.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">{activeDeals.length} active deals</p>
+          <CardContent className="p-0 pt-2">
+            <div className="text-lg md:text-2xl font-bold">{companies.length}</div>
+            <p className="text-xs text-muted-foreground">
+              <span className="text-green-600">+{activeCustomers}</span> active customers
+            </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Deal Size</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+        <Card className="p-3 md:p-6">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
+            <CardTitle className="text-xs md:text-sm font-medium">Total ARR</CardTitle>
+            <DollarSign className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${Math.round(averageDealSize).toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Per active deal</p>
+          <CardContent className="p-0 pt-2">
+            <div className="text-lg md:text-2xl font-bold">${(totalARR / 1000000).toFixed(1)}M</div>
+            <p className="text-xs text-muted-foreground">Annual recurring revenue</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Closed Won</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+        <Card className="p-3 md:p-6">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
+            <CardTitle className="text-xs md:text-sm font-medium">Avg Company Size</CardTitle>
+            <Users className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${closedWonValue.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">{closedWonDeals.length} deals won</p>
+          <CardContent className="p-0 pt-2">
+            <div className="text-lg md:text-2xl font-bold">
+              {Math.round(companies.reduce((sum: number, c: any) => sum + (c.employees || 0), 0) / companies.length) ||
+                0}
+            </div>
+            <p className="text-xs text-muted-foreground">Employees per company</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Win Rate</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+        <Card className="p-3 md:p-6 col-span-2 lg:col-span-1">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
+            <CardTitle className="text-xs md:text-sm font-medium">Industries</CardTitle>
+            <TrendingUp className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{Math.round(winRate)}%</div>
-            <p className="text-xs text-muted-foreground">Closed deals</p>
+          <CardContent className="p-0 pt-2">
+            <div className="text-lg md:text-2xl font-bold">{new Set(companies.map((c: any) => c.industry)).size}</div>
+            <p className="text-xs text-muted-foreground">Unique sectors</p>
           </CardContent>
         </Card>
       </div>
 
-      {viewMode === "charts" && (
-        <div className="grid gap-4 md:grid-cols-2">
-          <DealsStageChart deals={deals} />
-          <ClosedWonChart deals={deals} />
-        </div>
-      )}
-
-      {viewMode === "kanban" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-          {stages.map((stage) => (
-            <div
-              key={stage}
-              className={`min-h-[500px] rounded-lg border-2 border-dashed p-4 ${
-                dragOverStage === stage ? "border-blue-500 bg-blue-50" : "border-gray-200"
-              } ${getStageColor(stage)}`}
-              onDragOver={(e) => handleDragOver(e, stage)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, stage)}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-sm">{stage}</h3>
-                <Badge variant="secondary" className="text-xs">
-                  {dealsByStage[stage]?.length || 0}
-                </Badge>
+      {/* Mobile-responsive Search and Filters */}
+      <Card>
+        <CardContent className="p-3 md:p-6">
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Search companies by name, domain, or description..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full sm:w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    {statusOptions.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="space-y-3">
-                {dealsByStage[stage]?.map((deal: any) => (
+              <div className="flex items-center gap-2">
+                <Select value={industryFilter} onValueChange={setIndustryFilter}>
+                  <SelectTrigger className="w-full sm:w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Industries</SelectItem>
+                    {industryCategories.map((industry) => (
+                      <SelectItem key={industry} value={industry}>
+                        {industry}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-full sm:w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="name">Name</SelectItem>
+                    <SelectItem value="industry">Industry</SelectItem>
+                    <SelectItem value="arr">ARR</SelectItem>
+                    <SelectItem value="employees">Size</SelectItem>
+                    <SelectItem value="lastActivity">Activity</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Main Content - Mobile Responsive */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Companies List */}
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>All Companies ({sortedCompanies.length})</CardTitle>
+              <CardDescription>Comprehensive company profiles with business intelligence</CardDescription>
+            </CardHeader>
+            <CardContent className="p-3 md:p-6">
+              {/* Mobile: Card view */}
+              <div className="block lg:hidden space-y-4">
+                {sortedCompanies.map((company: any) => (
                   <Card
-                    key={deal._id || deal.id}
-                    className="cursor-move hover:shadow-md transition-shadow"
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, deal._id || deal.id)}
+                    key={company._id || company.id}
+                    className={`cursor-pointer hover:shadow-md transition-shadow ${selectedCompany === (company._id || company.id) ? "ring-2 ring-blue-500" : ""}`}
+                    onClick={() => setSelectedCompany(company._id || company.id)}
                   >
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm font-medium truncate">{deal.title}</CardTitle>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center space-x-3 flex-1 min-w-0">
+                          <Avatar className="h-10 w-10 flex-shrink-0">
+                            <AvatarImage src="/placeholder.svg?height=40&width=40" />
+                            <AvatarFallback>
+                              {company.name
+                                .split(" ")
+                                .map((n: string) => n[0])
+                                .join("")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-sm truncate">{company.name}</div>
+                            <div className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Globe className="h-3 w-3" />
+                              <span className="truncate">{company.domain || "No website"}</span>
+                            </div>
+                          </div>
+                        </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-6 w-6 p-0">
-                              <MoreHorizontal className="h-3 w-3" />
+                            <Button variant="ghost" size="sm" className="flex-shrink-0">
+                              <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEdit(deal)}>Edit</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setSelectedCompany(company._id || company.id)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              View Profile
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openEditCompanyDialog(company)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit Company
+                            </DropdownMenuItem>
+                            {company.domain && (
+                              <DropdownMenuItem>
+                                <ExternalLink className="mr-2 h-4 w-4" />
+                                Visit Website
+                              </DropdownMenuItem>
+                            )}
+                            {company.linkedinUrl && (
+                              <DropdownMenuItem>
+                                <Linkedin className="mr-2 h-4 w-4" />
+                                LinkedIn
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem
-                              onClick={() => handleDelete(deal._id || deal.id)}
+                              onClick={() => deleteCompany(company._id || company.id)}
                               className="text-red-600"
                             >
-                              Delete
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete Company
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-1">
-                          <Building2 className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground truncate">{deal.company}</span>
+
+                      <div className="grid grid-cols-2 gap-4 mb-3">
+                        <div>
+                          <Badge variant="outline" className="text-xs">
+                            {company.industry}
+                          </Badge>
                         </div>
-                        <div className="flex items-center space-x-1">
-                          <DollarSign className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs font-medium">${deal.value.toLocaleString()}</span>
+                        <div>
+                          <Badge className={getStatusColor(company.status)} variant="secondary">
+                            {company.status}
+                          </Badge>
                         </div>
-                        <div className="flex items-center space-x-1">
-                          <User className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground truncate">{deal.assignedTo}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-1">
-                            <Calendar className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(deal.expectedCloseDate).toLocaleDateString()}
-                            </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 text-xs">
+                        <div>
+                          <div className="font-medium">ARR</div>
+                          <div className="text-muted-foreground">
+                            ${((company.estimatedARR || 0) / 1000000).toFixed(1)}M
                           </div>
-                          <span className="text-xs font-medium">{deal.probability}%</span>
+                        </div>
+                        <div>
+                          <div className="font-medium">Employees</div>
+                          <div className="text-muted-foreground">{company.employees || "N/A"}</div>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
                 ))}
               </div>
-              <Button
-                variant="ghost"
-                className="w-full mt-4 border-dashed border-2 border-gray-300 hover:border-gray-400"
-                onClick={() => {
-                  setFormData({ ...formData, stage })
-                  setIsDialogOpen(true)
-                }}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Deal
-              </Button>
-            </div>
-          ))}
-        </div>
-      )}
 
-      {/* List View */}
-      {viewMode === "list" && (
-        <>
-          {/* Filters and Search */}
-          <div className="flex items-center space-x-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search deals..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
-                />
-              </div>
-            </div>
-            <Select value={filterStage} onValueChange={setFilterStage}>
-              <SelectTrigger className="w-[180px]">
-                <Filter className="mr-2 h-4 w-4" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Stages</SelectItem>
-                {stages.map((stage) => (
-                  <SelectItem key={stage} value={stage}>
-                    {stage}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-[180px]">
-                <SortAsc className="mr-2 h-4 w-4" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="createdAt">Date Created</SelectItem>
-                <SelectItem value="value">Deal Value</SelectItem>
-                <SelectItem value="stage">Stage</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Deals Grid */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredAndSortedDeals.map((deal: Deal) => (
-              <Card key={deal._id || deal.id} className="cursor-pointer hover:shadow-md transition-shadow">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">{deal.title}</CardTitle>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleEdit(deal)}>Edit</DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleDelete(deal._id || deal.id || "")}
-                        className="text-red-600"
+              {/* Desktop: Table view */}
+              <div className="hidden lg:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Company</TableHead>
+                      <TableHead>Industry</TableHead>
+                      <TableHead>ARR</TableHead>
+                      <TableHead>Size</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedCompanies.map((company: any) => (
+                      <TableRow
+                        key={company._id || company.id}
+                        className={`cursor-pointer hover:bg-muted/50 ${selectedCompany === (company._id || company.id) ? "bg-muted" : ""}`}
+                        onClick={() => setSelectedCompany(company._id || company.id)}
                       >
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                        <TableCell>
+                          <div className="flex items-center space-x-3">
+                            <Avatar>
+                              <AvatarImage src="/placeholder.svg?height=40&width=40" />
+                              <AvatarFallback>
+                                {company.name
+                                  .split(" ")
+                                  .map((n: string) => n[0])
+                                  .join("")}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="font-medium">{company.name}</div>
+                              <div className="text-sm text-muted-foreground flex items-center gap-1">
+                                <Globe className="h-3 w-3" />
+                                {company.domain || "No website"}
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{company.industry}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">${((company.estimatedARR || 0) / 1000000).toFixed(1)}M</div>
+                          <div className="text-sm text-muted-foreground">ARR</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{company.employees || "N/A"}</div>
+                          <div className="text-sm text-muted-foreground">employees</div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(company.status)}>{company.status}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setSelectedCompany(company._id || company.id)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                View Profile
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openEditCompanyDialog(company)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit Company
+                              </DropdownMenuItem>
+                              {company.domain && (
+                                <DropdownMenuItem>
+                                  <ExternalLink className="mr-2 h-4 w-4" />
+                                  Visit Website
+                                </DropdownMenuItem>
+                              )}
+                              {company.linkedinUrl && (
+                                <DropdownMenuItem>
+                                  <Linkedin className="mr-2 h-4 w-4" />
+                                  LinkedIn
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem
+                                onClick={() => deleteCompany(company._id || company.id)}
+                                className="text-red-600"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete Company
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Company Profile Sidebar - Mobile Responsive */}
+        <div className="space-y-4">
+          {selectedCompanyData ? (
+            <>
+              {/* Company Info */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Avatar className="h-8 w-8 md:h-10 md:w-10">
+                      <AvatarImage src="/placeholder.svg?height=40&width=40" />
+                      <AvatarFallback>
+                        {selectedCompanyData.name
+                          .split(" ")
+                          .map((n: string) => n[0])
+                          .join("")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="truncate">{selectedCompanyData.name}</span>
+                  </CardTitle>
+                  <CardDescription>{selectedCompanyData.industry}</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">{deal.company}</span>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <div className="font-medium">ARR</div>
+                      <div className="text-muted-foreground">
+                        ${((selectedCompanyData.estimatedARR || 0) / 1000000).toFixed(1)}M
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">${deal.value.toLocaleString()}</span>
+                    <div>
+                      <div className="font-medium">Employees</div>
+                      <div className="text-muted-foreground">{selectedCompanyData.employees || "N/A"}</div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">{deal.assignedTo}</span>
+                    <div>
+                      <div className="font-medium">Founded</div>
+                      <div className="text-muted-foreground">{selectedCompanyData.foundedYear || "N/A"}</div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">
-                        {new Date(deal.expectedCloseDate).toLocaleDateString()}
-                      </span>
+                    <div>
+                      <div className="font-medium">Location</div>
+                      <div className="text-muted-foreground truncate">{selectedCompanyData.location || "N/A"}</div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <Badge className={stageColors[deal.stage as keyof typeof stageColors]}>{deal.stage}</Badge>
-                      <span className="text-sm font-medium">{deal.probability}%</span>
-                    </div>
-                    {deal.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-2">{deal.description}</p>
+                  </div>
+                  <div>
+                    <div className="font-medium text-sm mb-2">Description</div>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedCompanyData.description || "No description available"}
+                    </p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    {selectedCompanyData.domain && (
+                      <Button variant="outline" size="sm" asChild className="flex-1 bg-transparent">
+                        <a href={`https://${selectedCompanyData.domain}`} target="_blank" rel="noopener noreferrer">
+                          <Globe className="mr-2 h-4 w-4" />
+                          Website
+                        </a>
+                      </Button>
+                    )}
+                    {selectedCompanyData.linkedinUrl && (
+                      <Button variant="outline" size="sm" asChild className="flex-1 bg-transparent">
+                        <a href={selectedCompanyData.linkedinUrl} target="_blank" rel="noopener noreferrer">
+                          <Linkedin className="mr-2 h-4 w-4" />
+                          LinkedIn
+                        </a>
+                      </Button>
                     )}
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
 
-          {filteredAndSortedDeals.length === 0 && (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">No deals found matching your criteria.</p>
-            </div>
+              {/* Notes and Activity Tabs - Mobile Responsive */}
+              <Card>
+                <Tabs defaultValue="notes" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="notes">Notes ({companyNotes.length})</TabsTrigger>
+                    <TabsTrigger value="activity">Activity</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="notes" className="space-y-4 p-4">
+                    <div className="space-y-3">
+                      {companyNotes.map((note: any) => (
+                        <div key={note._id || note.id} className="p-3 border rounded-lg">
+                          <h4 className="font-medium text-sm mb-2 line-clamp-1">{note.title}</h4>
+                          <p className="text-sm text-muted-foreground line-clamp-3">{note.content}</p>
+                          <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+                            <span className="truncate">{note.assignedTo || "Unknown"}</span>
+                            <span>{new Date(note.createdAt || note.createdDate).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                      {companyNotes.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No notes found for this company
+                        </p>
+                      )}
+                      <Button variant="outline" size="sm" className="w-full bg-transparent">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Note
+                      </Button>
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="activity" className="space-y-4 p-4">
+                    <div className="space-y-3">
+                      <div className="flex items-start space-x-3">
+                        <div className="flex-shrink-0 mt-1">{getActivityIcon("company")}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium line-clamp-2">Company profile created</p>
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2 mt-1 text-xs text-muted-foreground">
+                            <span className="truncate">System</span>
+                            <span className="hidden sm:inline">•</span>
+                            <span>{new Date(selectedCompanyData.createdAt || "").toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </Card>
+            </>
+          ) : (
+            <Card>
+              <CardContent className="text-center py-12">
+                <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Select a Company</h3>
+                <p className="text-muted-foreground">
+                  Click on a company from the list to view its profile and activity
+                </p>
+              </CardContent>
+            </Card>
           )}
-        </>
-      )}
+        </div>
+      </div>
+
+      {/* Add/Edit Company Dialog - Mobile Responsive */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto mx-4">
+          <DialogHeader>
+            <DialogTitle>{editingCompany ? "Edit Company" : "Add New Company"}</DialogTitle>
+            <DialogDescription>
+              {editingCompany ? "Update company information" : "Enter the company details and business information"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="name">Company Name *</Label>
+              <Input
+                id="name"
+                value={newCompany.name}
+                onChange={(e) => setNewCompany({ ...newCompany, name: e.target.value })}
+                placeholder="Enter company name"
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="industry">Company's Industry Category</Label>
+                <Select
+                  value={newCompany.industry}
+                  onValueChange={(value) => setNewCompany({ ...newCompany, industry: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {industryCategories.map((industry) => (
+                      <SelectItem key={industry} value={industry}>
+                        {industry}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="arr">Estimated ARR ($)</Label>
+                <Input
+                  id="arr"
+                  type="number"
+                  value={newCompany.estimatedARR}
+                  onChange={(e) => setNewCompany({ ...newCompany, estimatedARR: e.target.value })}
+                  placeholder="Annual recurring revenue"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="linkedin">LinkedIn (link)</Label>
+                <Input
+                  id="linkedin"
+                  type="url"
+                  value={newCompany.linkedinUrl}
+                  onChange={(e) => setNewCompany({ ...newCompany, linkedinUrl: e.target.value })}
+                  placeholder="https://linkedin.com/company/..."
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="domain">Domain</Label>
+                <Input
+                  id="domain"
+                  value={newCompany.domain}
+                  onChange={(e) => setNewCompany({ ...newCompany, domain: e.target.value })}
+                  placeholder="company.com"
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="description">Company Description</Label>
+              <Textarea
+                id="description"
+                value={newCompany.description}
+                onChange={(e) => setNewCompany({ ...newCompany, description: e.target.value })}
+                placeholder="Brief description of the company's business and services"
+                rows={3}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="employees">Employees</Label>
+                <Input
+                  id="employees"
+                  type="number"
+                  value={newCompany.employees}
+                  onChange={(e) => setNewCompany({ ...newCompany, employees: e.target.value })}
+                  placeholder="Number of employees"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="founded">Founded Year</Label>
+                <Input
+                  id="founded"
+                  type="number"
+                  value={newCompany.foundedYear}
+                  onChange={(e) => setNewCompany({ ...newCompany, foundedYear: e.target.value })}
+                  placeholder="2020"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={newCompany.status}
+                  onValueChange={(value) => setNewCompany({ ...newCompany, status: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusOptions.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="location">Location</Label>
+              <Input
+                id="location"
+                value={newCompany.location}
+                onChange={(e) => setNewCompany({ ...newCompany, location: e.target.value })}
+                placeholder="City, State/Country"
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="w-full sm:w-auto">
+              Cancel
+            </Button>
+            <Button onClick={handleSaveCompany} className="w-full sm:w-auto">
+              {editingCompany ? "Update Company" : "Add Company"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
