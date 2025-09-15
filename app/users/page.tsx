@@ -191,7 +191,13 @@ export default function UsersPage() {
           body: JSON.stringify(formData),
         })
 
-        if (!response.ok) throw new Error("Failed to update user")
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || "Failed to update user")
+        }
+
+        const result = await response.json()
+        console.log("User updated successfully:", result)
       } else {
         // Create new user
         const response = await fetch("/api/users", {
@@ -209,7 +215,13 @@ export default function UsersPage() {
           }),
         })
 
-        if (!response.ok) throw new Error("Failed to create user")
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || "Failed to create user")
+        }
+
+        const result = await response.json()
+        console.log("User created successfully:", result)
       }
 
       // Refresh data
@@ -220,6 +232,7 @@ export default function UsersPage() {
       setIsDialogOpen(false)
     } catch (error) {
       console.error("Error saving user:", error)
+      alert(`Error: ${error.message}`)
     }
   }
 
@@ -231,12 +244,19 @@ export default function UsersPage() {
         method: "DELETE",
       })
 
-      if (!response.ok) throw new Error("Failed to delete user")
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to delete user")
+      }
+
+      const result = await response.json()
+      console.log("User deleted successfully:", result)
 
       // Refresh data
       mutate()
     } catch (error) {
       console.error("Error deleting user:", error)
+      alert(`Error: ${error.message}`)
     }
   }
 
