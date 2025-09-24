@@ -20,7 +20,8 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
     if (!doc) return NextResponse.json({ success: false, error: "Task not found" }, { status: 404 })
 
     return NextResponse.json({ success: true, data: { id: String(doc._id), ...doc } })
-  } catch {
+  } catch (error) {
+    console.error("[tasks.GET] error:", error)
     return NextResponse.json({ success: false, error: "Failed to fetch task" }, { status: 500 })
   }
 }
@@ -59,7 +60,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       data: { id: String(updated._id), ...updated },
       message: "Task updated successfully",
     })
-  } catch {
+  } catch (error) {
+    console.error("[tasks.PUT] error:", error)
     return NextResponse.json({ success: false, error: "Failed to update task" }, { status: 500 })
   }
 }
@@ -98,7 +100,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       data: { id: String(updated._id), ...updated },
       message: "Task updated successfully",
     })
-  } catch {
+  } catch (error) {
+    console.error("[tasks.PATCH] error:", error)
     return NextResponse.json({ success: false, error: "Failed to update task" }, { status: 500 })
   }
 }
@@ -114,7 +117,8 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
     if (!res.deletedCount) return NextResponse.json({ success: false, error: "Task not found" }, { status: 404 })
 
     return NextResponse.json({ success: true, message: "Task deleted successfully" })
-  } catch {
+  } catch (error) {
+    console.error("[tasks.DELETE] error:", error)
     return NextResponse.json({ success: false, error: "Failed to delete task" }, { status: 500 })
   }
 }
