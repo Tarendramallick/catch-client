@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { toast } from "@/components/ui/use-toast"
 import {
   Plus,
   Calendar,
@@ -32,7 +33,6 @@ import {
   Filter,
   Search,
 } from "lucide-react"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 const initialTasks = [
   {
@@ -259,17 +259,19 @@ export default function TasksPage() {
         body: JSON.stringify(taskData),
       })
 
-      if (response.ok) {
-        mutateTasks() // Refresh tasks data
-        setIsDialogOpen(false)
-        resetForm()
-      } else {
+      if (!response.ok) {
         const errorData = await response.json()
-        alert(`Failed to create task: ${errorData.error || "Unknown error"}`)
+        throw new Error(errorData.error || "Failed to create task")
       }
+
+      const result = await response.json()
+      console.log("Task created successfully:", result)
+      mutateTasks() // Refresh tasks data
+      setIsDialogOpen(false)
+      resetForm()
     } catch (error) {
       console.error("Error creating task:", error)
-      alert("Failed to create task")
+      alert(`Error: ${error.message}`)
     }
   }
 
@@ -284,15 +286,21 @@ export default function TasksPage() {
         body: JSON.stringify({ status: task.completed || task.status === "completed" ? "pending" : "completed" }),
       })
 
-      if (response.ok) {
-        mutateTasks() // Refresh tasks data
-      } else {
+      if (!response.ok) {
         const errorData = await response.json()
-        alert(`Failed to update task: ${errorData.error || "Unknown error"}`)
+        throw new Error(errorData.error || "Failed to update task")
       }
+
+      const result = await response.json()
+      console.log("Task updated successfully:", result)
+      mutateTasks() // Refresh tasks data
     } catch (error) {
       console.error("Error updating task:", error)
-      alert("Failed to update task")
+      toast({
+        title: "Error",
+        description: `Failed to update task: ${error.message}`,
+        variant: "destructive",
+      })
     }
   }
 
@@ -303,14 +311,17 @@ export default function TasksPage() {
           method: "DELETE",
         })
 
-        if (response.ok) {
-          mutateTasks() // Refresh tasks data
-        } else {
-          alert("Failed to delete task")
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || "Failed to delete task")
         }
+
+        const result = await response.json()
+        console.log("Task deleted successfully:", result)
+        mutateTasks() // Refresh tasks data
       } catch (error) {
         console.error("Error deleting task:", error)
-        alert("Failed to delete task")
+        alert(`Error: ${error.message}`)
       }
     }
   }
@@ -486,39 +497,93 @@ export default function TasksPage() {
           </CardContent>
         </Card>
         <Card className="p-3 md:p-6">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
-            <CardTitle className="text-xs md:text-sm font-medium">Today</CardTitle>
-            <Calendar className="h-3 w-3 md:h-4 md:w-4 text-blue-500" />
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className={`text-base flex items-center gap-2 text-blue-600`}>
+                <Calendar className="h-5 w-5" />
+                <Badge className={`bg-blue-500 text-white`}>{taskColumns.today.length || 0}</Badge>
+                Today
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => openAddTaskDialog("today")}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
           </CardHeader>
-          <CardContent className="p-0 pt-2">
-            <div className="text-lg md:text-2xl font-bold text-blue-600">{taskColumns.today.length}</div>
+          <CardContent className="space-y-3 max-h-96 overflow-y-auto">
+            {taskColumns.today.map((task: any) => (
+              <TaskCard key={task.id} task={task} />
+            ))}
+            {taskColumns.today.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">No tasks</p>
+            )}
           </CardContent>
         </Card>
         <Card className="p-3 md:p-6">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
-            <CardTitle className="text-xs md:text-sm font-medium">This Week</CardTitle>
-            <Clock className="h-3 w-3 md:h-4 md:w-4 text-yellow-500" />
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className={`text-base flex items-center gap-2 text-yellow-600`}>
+                <Clock className="h-5 w-5" />
+                <Badge className={`bg-yellow-500 text-white`}>{taskColumns.thisWeek.length || 0}</Badge>
+                This Week
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => openAddTaskDialog("thisWeek")}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
           </CardHeader>
-          <CardContent className="p-0 pt-2">
-            <div className="text-lg md:text-2xl font-bold text-yellow-600">{taskColumns.thisWeek.length}</div>
+          <CardContent className="space-y-3 max-h-96 overflow-y-auto">
+            {taskColumns.thisWeek.map((task: any) => (
+              <TaskCard key={task.id} task={task} />
+            ))}
+            {taskColumns.thisWeek.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">No tasks</p>
+            )}
           </CardContent>
         </Card>
         <Card className="p-3 md:p-6">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
-            <CardTitle className="text-xs md:text-sm font-medium">Upcoming</CardTitle>
-            <Target className="h-3 w-3 md:h-4 md:w-4 text-green-500" />
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className={`text-base flex items-center gap-2 text-green-600`}>
+                <Target className="h-5 w-5" />
+                <Badge className={`bg-green-500 text-white`}>{taskColumns.upcoming.length || 0}</Badge>
+                Upcoming
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => openAddTaskDialog("upcoming")}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
           </CardHeader>
-          <CardContent className="p-0 pt-2">
-            <div className="text-lg md:text-2xl font-bold text-green-600">{taskColumns.upcoming.length}</div>
+          <CardContent className="space-y-3 max-h-96 overflow-y-auto">
+            {taskColumns.upcoming.map((task: any) => (
+              <TaskCard key={task.id} task={task} />
+            ))}
+            {taskColumns.upcoming.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">No tasks</p>
+            )}
           </CardContent>
         </Card>
         <Card className="p-3 md:p-6 col-span-2 md:col-span-1">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
-            <CardTitle className="text-xs md:text-sm font-medium">Completed</CardTitle>
-            <CheckCircle className="h-3 w-3 md:h-4 md:w-4 text-purple-500" />
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className={`text-base flex items-center gap-2 text-purple-600`}>
+                <CheckCircle className="h-5 w-5" />
+                <Badge className={`bg-purple-500 text-white`}>{taskColumns.completed.length || 0}</Badge>
+                Completed
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setIsCompletedOpen(!isCompletedOpen)}>
+                {isCompletedOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </Button>
+            </div>
           </CardHeader>
-          <CardContent className="p-0 pt-2">
-            <div className="text-lg md:text-2xl font-bold text-purple-600">{taskColumns.completed.length}</div>
+          <CardContent className="pt-0">
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 max-h-96 overflow-y-auto">
+              {taskColumns.completed.map((task: any) => (
+                <TaskCard key={task.id} task={task} />
+              ))}
+              {taskColumns.completed.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4 col-span-full">No completed tasks yet</p>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -674,40 +739,6 @@ export default function TasksPage() {
           </CardContent>
         </Card>
       )}
-
-      {/* Completed Tasks - Collapsible */}
-      <Collapsible open={isCompletedOpen} onOpenChange={setIsCompletedOpen}>
-        <Card className="border-purple-200">
-          <CollapsibleTrigger asChild>
-            <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg text-purple-600 flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5" />
-                  Completed Tasks ({taskColumns.completed.length})
-                </CardTitle>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="bg-purple-100 text-purple-800">
-                    {taskColumns.completed.length} completed
-                  </Badge>
-                  {isCompletedOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                </div>
-              </div>
-            </CardHeader>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <CardContent className="pt-0">
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 max-h-96 overflow-y-auto">
-                {taskColumns.completed.map((task: any) => (
-                  <TaskCard key={task.id} task={task} />
-                ))}
-                {taskColumns.completed.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-4 col-span-full">No completed tasks yet</p>
-                )}
-              </div>
-            </CardContent>
-          </CollapsibleContent>
-        </Card>
-      </Collapsible>
 
       {/* Add Task Dialog - Mobile Responsive */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

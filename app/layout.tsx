@@ -5,13 +5,13 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { OnboardingRedirect } from "@/components/onboarding-redirect"
 import { MainLayoutContent } from "@/components/main-layout-content"
-import { Toaster } from "@/components/ui/toaster"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "CatchClients - Smart CRM for Modern Teams",
   description: "Modern CRM platform to manage client relationships, track leads, and streamline sales operations",
+    generator: 'v0.app'
 }
 
 export default function RootLayout({
@@ -32,7 +32,6 @@ export default function RootLayout({
         >
           <OnboardingRedirect />
           <MainLayoutContent>{children}</MainLayoutContent>
-          <Toaster />
         </ThemeProvider>
       </body>
     </html>
