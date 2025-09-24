@@ -20,7 +20,6 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { toast } from "@/components/ui/use-toast"
 import {
   Plus,
   MoreHorizontal,
@@ -110,7 +109,7 @@ const getActivityIcon = (type: string) => {
 }
 
 export default function CompaniesPage() {
-  const { data: companies = [], error, mutate: mutateCompanies } = useSWR("/api/companies", fetcher)
+  const { data: companies = [], error, mutate } = useSWR("/api/companies", fetcher)
   const { data: notes = [] } = useSWR("/api/notes", fetcher)
 
   const [searchTerm, setSearchTerm] = useState("")
@@ -174,11 +173,7 @@ export default function CompaniesPage() {
 
   const handleSaveCompany = async () => {
     if (!newCompany.name.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a company name.",
-        variant: "destructive",
-      })
+      alert("Please enter a company name.")
       return
     }
 
@@ -216,22 +211,13 @@ export default function CompaniesPage() {
         throw new Error(errorData.error || "Failed to save company")
       }
 
-      const result = await response.json()
-      console.log("Company saved successfully:", result)
-      mutateCompanies()
+      console.log("Company saved successfully")
+      mutate() // Refresh data
       setIsDialogOpen(false)
       resetForm()
-      toast({
-        title: "Success",
-        description: editingCompany ? "Company updated successfully" : "Company created successfully",
-      })
     } catch (error) {
       console.error("Error saving company:", error)
-      toast({
-        title: "Error",
-        description: `Failed to save company: ${error.message}`,
-        variant: "destructive",
-      })
+      alert("Failed to save company")
     }
   }
 
@@ -247,20 +233,11 @@ export default function CompaniesPage() {
           throw new Error(errorData.error || "Failed to delete company")
         }
 
-        const result = await response.json()
-        console.log("Company deleted successfully:", result)
-        mutateCompanies()
-        toast({
-          title: "Success",
-          description: "Company deleted successfully",
-        })
+        console.log("Company deleted successfully")
+        mutate() // Refresh data
       } catch (error) {
         console.error("Error deleting company:", error)
-        toast({
-          title: "Error",
-          description: `Failed to delete company: ${error.message}`,
-          variant: "destructive",
-        })
+        alert("Failed to delete company")
       }
     }
   }
@@ -318,7 +295,7 @@ export default function CompaniesPage() {
         <div className="text-center">
           <h2 className="text-lg font-semibold mb-2">Failed to load companies</h2>
           <p className="text-muted-foreground mb-4">Error: {error.message || "Unknown error"}</p>
-          <Button onClick={() => mutateCompanies()}>Try Again</Button>
+          <Button onClick={() => mutate()}>Try Again</Button>
         </div>
       </div>
     )

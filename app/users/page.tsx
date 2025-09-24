@@ -18,7 +18,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { toast } from "@/components/ui/use-toast"
 import {
   Plus,
   Search,
@@ -73,7 +72,7 @@ const getRoleColor = (role: string) => {
 }
 
 export default function UsersPage() {
-  const { data: users = [], error, mutate: mutateUsers } = useSWR("/api/users", fetcher)
+  const { data: users = [], error, mutate } = useSWR("/api/users", fetcher)
   const { data: tasks = [] } = useSWR("/api/tasks", fetcher)
 
   const [searchTerm, setSearchTerm] = useState("")
@@ -179,11 +178,7 @@ export default function UsersPage() {
     e.preventDefault()
 
     if (!formData.name?.trim() || !formData.email?.trim()) {
-      toast({
-        title: "Error",
-        description: "Please fill in the name and email fields.",
-        variant: "destructive",
-      })
+      alert("Please fill in the name and email fields.")
       return
     }
 
@@ -230,18 +225,14 @@ export default function UsersPage() {
       }
 
       // Refresh data
-      mutateUsers()
+      mutate()
 
       // Reset form
       resetForm()
       setIsDialogOpen(false)
     } catch (error) {
       console.error("Error saving user:", error)
-      toast({
-        title: "Error",
-        description: `Error: ${error.message}`,
-        variant: "destructive",
-      })
+      alert(`Error: ${error.message}`)
     }
   }
 
@@ -262,110 +253,64 @@ export default function UsersPage() {
       console.log("User deleted successfully:", result)
 
       // Refresh data
-      mutateUsers()
+      mutate()
     } catch (error) {
       console.error("Error deleting user:", error)
-      toast({
-        title: "Error",
-        description: `Error: ${error.message}`,
-        variant: "destructive",
-      })
+      alert(`Error: ${error.message}`)
     }
   }
 
-  const handleSaveUser = async () => {
-    if (!formData.name?.trim() || !formData.email?.trim()) {
-      toast({
-        title: "Error",
-        description: "Please fill in the name and email fields.",
-        variant: "destructive",
-      })
+  const handleSaveUser = () => {
+    if (!newUser.name.trim() || !newUser.email.trim()) {
+      alert("Please fill in the name and email fields.")
       return
     }
 
-    try {
-      if (editingUser) {
-        // Update existing user
-        const response = await fetch(`/api/users/${editingUser._id || editingUser.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
-        })
+    // if (editingUser) {
+    //   // Update existing user
+    //   setUsers(
+    //     users.map((user) =>
+    //       user.id === editingUser
+    //         ? {
+    //             ...user,
+    //             name: newUser.name,
+    //             email: newUser.email,
+    //             phone: newUser.phone,
+    //             role: newUser.role,
+    //             department: newUser.department,
+    //             status: newUser.status,
+    //             lastActive: new Date().toISOString().split("T")[0],
+    //           }
+    //         : user,
+    //     ),
+    //   )
+    // } else {
+    //   // Create new user
+    //   const user = {
+    //     id: `u${Date.now()}`,
+    //     name: newUser.name,
+    //     email: newUser.email,
+    //     phone: newUser.phone,
+    //     role: newUser.role,
+    //     department: newUser.department,
+    //     status: newUser.status,
+    //     avatar: "/placeholder.svg?height=40&width=40",
+    //     joinDate: new Date().toISOString().split("T")[0],
+    //     lastActive: new Date().toISOString().split("T")[0],
+    //     tasksAssigned: 0,
+    //     tasksCompleted: 0,
+    //   }
 
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || "Failed to update user")
-        }
+    //   setUsers([user, ...users])
+    // }
 
-        const result = await response.json()
-        console.log("User updated successfully:", result)
-        mutateUsers()
-        setIsDialogOpen(false)
-        resetForm()
-        toast({
-          title: "Success",
-          description: "User updated successfully",
-        })
-      } else {
-        // Create new user
-        const response = await fetch("/api/users", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || "Failed to create user")
-        }
-
-        const result = await response.json()
-        console.log("User created successfully:", result)
-        mutateUsers()
-        setIsDialogOpen(false)
-        resetForm()
-        toast({
-          title: "Success",
-          description: "User created successfully",
-        })
-      }
-    } catch (error) {
-      console.error("Error saving user:", error)
-      toast({
-        title: "Error",
-        description: `Failed to save user: ${error.message}`,
-        variant: "destructive",
-      })
-    }
+    setIsDialogOpen(false)
+    resetForm()
   }
 
-  const deleteUser = async (userId: string) => {
+  const deleteUser = (userId) => {
     if (confirm("Are you sure you want to delete this user?")) {
-      try {
-        const response = await fetch(`/api/users/${userId}`, {
-          method: "DELETE",
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || "Failed to delete user")
-        }
-
-        const result = await response.json()
-        console.log("User deleted successfully:", result)
-        mutateUsers()
-        toast({
-          title: "Success",
-          description: "User deleted successfully",
-        })
-      } catch (error) {
-        console.error("Error deleting user:", error)
-        toast({
-          title: "Error",
-          description: `Failed to delete user: ${error.message}`,
-          variant: "destructive",
-        })
-      }
+      // setUsers(users.filter((user) => user.id !== userId))
     }
   }
 

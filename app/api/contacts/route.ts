@@ -1,108 +1,112 @@
-import { NextResponse, type NextRequest } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import { ObjectId } from "mongodb"
-import { getContactsCollection } from "@/lib/database/collections"
+import { getContactsCollection, getActivitiesCollection } from "@/lib/database/collections"
 
 export const dynamic = "force-dynamic"
 
-function toObjectId(id: string) {
-  if (!ObjectId.isValid(id)) return null
-  return new ObjectId(id)
-}
-
-// GET /api/contacts/[id] - Get a specific contact from MongoDB
-export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
+// GET /api/contacts - Get all contacts (from MongoDB)
+export async function GET(request: NextRequest) {
   try {
-    const oid = toObjectId(params.id)
-    if (!oid) return NextResponse.json({ success: false, error: "Invalid id" }, { status: 400 })
+    const { searchParams } = new URL(request.url)
+    const status = searchParams.get("status")
+    const company = searchParams.get("company")
+    const limit = Number.parseInt(searchParams.get("limit") || "20")
+    const offset = Number.parseInt(searchParams.get("offset") || "0")
 
-    const col = await getContactsCollection()
-    const doc = await col.findOne({ _id: oid })
-    if (!doc) return NextResponse.json({ success: false, error: "Contact not found" }, { status: 404 })
+    const contactsCol = await getContactsCollection()
 
-    return NextResponse.json({ success: true, data: { id: String(doc._id), ...doc } })
-  } catch (error) {
-    return NextResponse.json({ success: false, error: "Failed to fetch contact" }, { status: 500 })
-  }
-}
+    const query: Record<string, any> = {}
+    if (status) query.status = status
+    if (company) query.company = { $regex: company, $options: "i" }
 
-// PATCH /api/contacts/[id] - Partially update a contact in MongoDB
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const oid = toObjectId(params.id)
-    if (!oid) return NextResponse.json({ success: false, error: "Invalid id" }, { status: 400 })
+    const total = await contactsCol.countDocuments(query)
+    const docs = await contactsCol.find(query).sort({ createdDate: -1 }).skip(offset).limit(limit).toArray()
 
-    const body = await request.json()
-    const allowed = ["name", "email", "phone", "company", "position", "status", "tags", "website", "lastContact"]
-    const $set: Record<string, any> = {}
-    for (const k of allowed) if (k in body) $set[k] = body[k]
-    $set.updatedDate = new Date()
-
-    const col = await getContactsCollection()
-    const result = await col.findOneAndUpdate({ _id: oid }, { $set }, { returnDocument: "after" })
-
-    const updated = result.value
-    if (!updated) return NextResponse.json({ success: false, error: "Contact not found" }, { status: 404 })
+    const data = docs.map((d) => ({
+      id: d._id?.toString(),
+      ...d,
+    }))
 
     return NextResponse.json({
       success: true,
-      data: { id: String(updated._id), ...updated },
-      message: "Contact updated successfully",
+      data,
+      total,
+      filtered: data.length,
     })
-  } catch (error: any) {
-    if (error?.code === 11000) {
-      return NextResponse.json({ success: false, error: "A contact with this email already exists" }, { status: 409 })
-    }
-    return NextResponse.json({ success: false, error: "Failed to update contact" }, { status: 500 })
+  } catch (error) {
+    console.error("[contacts.GET] error:", error)
+    return NextResponse.json({ success: false, error: "Failed to fetch contacts" }, { status: 500 })
   }
 }
 
-// PUT /api/contacts/[id] - Update a contact in MongoDB
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+// POST /api/contacts - Create a new contact (writes to MongoDB)
+export async function POST(request: NextRequest) {
   try {
-    const oid = toObjectId(params.id)
-    if (!oid) return NextResponse.json({ success: false, error: "Invalid id" }, { status: 400 })
-
     const body = await request.json()
-    const allowed = ["name", "email", "phone", "company", "position", "status", "tags", "website", "lastContact"]
-    const $set: Record<string, any> = {}
-    for (const k of allowed) if (k in body) $set[k] = body[k]
-    $set.updatedDate = new Date()
+    const { name, email, phone, company, position, status, tags, website, assignedToId } = body
 
-    if (!$set.name || !$set.email) {
+    if (!name || !email) {
       return NextResponse.json({ success: false, error: "Name and email are required" }, { status: 400 })
     }
 
-    const col = await getContactsCollection()
-    const result = await col.findOneAndUpdate({ _id: oid }, { $set }, { returnDocument: "after" })
+    const contactsCol = await getContactsCollection()
+    const now = new Date()
 
-    const updated = result.value
-    if (!updated) return NextResponse.json({ success: false, error: "Contact not found" }, { status: 404 })
+    const doc = {
+      name,
+      email,
+      phone: phone || "",
+      company: company || "",
+      position: position || "",
+      status: status || "Cold Lead",
+      tags: Array.isArray(tags) ? tags : [],
+      website: website || "",
+      lastContact: now,
+      avatar: "/placeholder.svg?height=40&width=40",
+      createdDate: now,
+      updatedDate: now,
+      assignedToId: assignedToId ? new ObjectId(assignedToId) : undefined,
+    }
 
-    return NextResponse.json({
-      success: true,
-      data: { id: String(updated._id), ...updated },
-      message: "Contact updated successfully",
-    })
+    const res = await contactsCol.insertOne(doc as any)
+
+    // Optional: log an activity for audit trail
+    try {
+      const activitiesCol = await getActivitiesCollection()
+      await activitiesCol.insertOne({
+        type: "contact_created",
+        title: "New contact added",
+        description: `${doc.name} added to CRM`,
+        timestamp: now,
+        userId: assignedToId ? new ObjectId(assignedToId) : undefined,
+        userName: "System",
+        userAvatar: "/placeholder.svg?height=40&width=40",
+        entityType: "contact",
+        entityId: res.insertedId,
+        entityName: doc.name,
+        isPublic: true,
+        metadata: { source: "app" },
+      })
+    } catch (e) {
+      console.warn("[contacts.POST] activity log failed:", e)
+    }
+
+    const created = { id: res.insertedId.toString(), _id: res.insertedId, ...doc }
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: created,
+        message: "Contact created successfully",
+      },
+      { status: 201 },
+    )
   } catch (error: any) {
+    // Handle duplicate email (unique index) gracefully
     if (error?.code === 11000) {
       return NextResponse.json({ success: false, error: "A contact with this email already exists" }, { status: 409 })
     }
-    return NextResponse.json({ success: false, error: "Failed to update contact" }, { status: 500 })
-  }
-}
-
-// DELETE /api/contacts/[id] - Delete a contact in MongoDB
-export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const oid = toObjectId(params.id)
-    if (!oid) return NextResponse.json({ success: false, error: "Invalid id" }, { status: 400 })
-
-    const col = await getContactsCollection()
-    const res = await col.deleteOne({ _id: oid })
-    if (!res.deletedCount) return NextResponse.json({ success: false, error: "Contact not found" }, { status: 404 })
-
-    return NextResponse.json({ success: true, message: "Contact deleted successfully" })
-  } catch {
-    return NextResponse.json({ success: false, error: "Failed to delete contact" }, { status: 500 })
+    console.error("[contacts.POST] error:", error)
+    return NextResponse.json({ success: false, error: "Failed to create contact" }, { status: 500 })
   }
 }

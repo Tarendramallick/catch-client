@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,90 +33,9 @@ import {
   Eye,
   Grid3X3,
   List,
+  Loader2,
 } from "lucide-react"
 import { ContactProfileDialog } from "@/components/contact-profile-dialog"
-import useSWR from "swr"
-import { toast } from "@/components/ui/use-toast"
-
-const fetcher = async (url: string) => {
-  const res = await fetch(url)
-  if (!res.ok) throw new Error("Failed to fetch")
-  const data = await res.json()
-  return data.data || data
-}
-
-const initialContacts = [
-  {
-    id: "c1",
-    name: "John Smith",
-    email: "john@acmecorp.com",
-    phone: "+1 (555) 123-4567",
-    company: "Acme Corp",
-    jobTitle: "CEO",
-    status: "Hot Lead",
-    tags: ["Enterprise", "Decision Maker"],
-    lastContact: "2 days ago",
-    avatar: "/placeholder.svg?height=40&width=40",
-    website: "https://acmecorp.com",
-    createdDate: "2024-01-10",
-  },
-  {
-    id: "c2",
-    name: "Sarah Johnson",
-    email: "sarah@techstart.io",
-    phone: "+1 (555) 987-6543",
-    company: "TechStart Inc",
-    jobTitle: "CTO",
-    status: "Qualified",
-    tags: ["Tech", "Startup"],
-    lastContact: "1 week ago",
-    avatar: "/placeholder.svg?height=40&width=40",
-    website: "https://techstart.io",
-    createdDate: "2024-01-08",
-  },
-  {
-    id: "c3",
-    name: "Mike Chen",
-    email: "mike@globalsolutions.com",
-    phone: "+1 (555) 456-7890",
-    company: "Global Solutions",
-    jobTitle: "VP Sales",
-    status: "Cold Lead",
-    tags: ["Enterprise", "Sales"],
-    lastContact: "3 weeks ago",
-    avatar: "/placeholder.svg?height=40&width=40",
-    website: "https://globalsolutions.com",
-    createdDate: "2024-01-05",
-  },
-  {
-    id: "c4",
-    name: "Emma Davis",
-    email: "emma@innovationlabs.com",
-    phone: "+1 (555) 321-0987",
-    company: "Innovation Labs",
-    jobTitle: "Product Manager",
-    status: "Nurturing",
-    tags: ["Product", "Innovation"],
-    lastContact: "5 days ago",
-    avatar: "/placeholder.svg?height=40&width=40",
-    website: "https://innovationlabs.com",
-    createdDate: "2024-01-12",
-  },
-  {
-    id: "c5",
-    name: "Alex Rodriguez",
-    email: "alex@futuresystems.com",
-    phone: "+1 (555) 654-3210",
-    company: "Future Systems",
-    jobTitle: "Engineering Director",
-    status: "Customer",
-    tags: ["Technical", "Engineering"],
-    lastContact: "Yesterday",
-    avatar: "/placeholder.svg?height=40&width=40",
-    website: "https://futuresystems.com",
-    createdDate: "2024-01-15",
-  },
-]
 
 const statusOptions = ["Hot Lead", "Qualified", "Cold Lead", "Nurturing", "Customer", "Lost"]
 
@@ -140,54 +59,62 @@ const getStatusColor = (status: string) => {
 }
 
 export default function ContactsPage() {
-  const { data: contacts = [], error, mutate: mutateContacts } = useSWR("/api/contacts", fetcher)
-
+  const [contacts, setContacts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [sortBy, setSortBy] = useState("name")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingContact, setEditingContact] = useState<any>(null)
+  const [editingContact, setEditingContact] = useState<string | null>(null)
   const [selectedContact, setSelectedContact] = useState<any>(null)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [viewMode, setViewMode] = useState<"grid" | "list">("list")
 
   // Form state
-  const [formData, setFormData] = useState({
+  const [newContact, setNewContact] = useState({
     name: "",
     email: "",
     phone: "",
     company: "",
-    jobTitle: "",
+    position: "",
     status: "Cold Lead",
     website: "",
     tags: "",
-    notes: "",
   })
 
-  // Load contacts from localStorage
-  // useEffect(() => {
-  //   const savedContacts = localStorage.getItem("catchclients-contacts")
-  //   if (savedContacts) {
-  //     setContacts(JSON.parse(savedContacts))
-  //   }
-  // }, [])
+  const fetchContacts = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch("/api/contacts")
+      const result = await response.json()
 
-  // Save contacts to localStorage
-  // useEffect(() => {
-  //   localStorage.setItem("catchclients-contacts", JSON.stringify(contacts))
-  // }, [contacts])
+      if (result.success) {
+        setContacts(result.data || [])
+      } else {
+        console.error("Failed to fetch contacts:", result.error)
+      }
+    } catch (error) {
+      console.error("Error fetching contacts:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchContacts()
+  }, [])
 
   const resetForm = () => {
-    setFormData({
+    setNewContact({
       name: "",
       email: "",
       phone: "",
       company: "",
-      jobTitle: "",
+      position: "",
       status: "Cold Lead",
       website: "",
       tags: "",
-      notes: "",
     })
     setEditingContact(null)
   }
@@ -198,18 +125,17 @@ export default function ContactsPage() {
   }
 
   const openEditContactDialog = (contact: any) => {
-    setFormData({
-      name: contact.name,
-      email: contact.email,
-      phone: contact.phone,
-      company: contact.company,
-      jobTitle: contact.jobTitle,
-      status: contact.status,
+    setNewContact({
+      name: contact.name || "",
+      email: contact.email || "",
+      phone: contact.phone || "",
+      company: contact.company || "",
+      position: contact.position || "",
+      status: contact.status || "Cold Lead",
       website: contact.website || "",
-      tags: contact.tags ? contact.tags.join(", ") : "",
-      notes: contact.notes || "",
+      tags: Array.isArray(contact.tags) ? contact.tags.join(", ") : "",
     })
-    setEditingContact(contact)
+    setEditingContact(contact.id)
     setIsDialogOpen(true)
   }
 
@@ -219,99 +145,91 @@ export default function ContactsPage() {
   }
 
   const handleSaveContact = async () => {
-    if (!formData.name.trim() || !formData.email.trim()) {
-      toast({
-        title: "Error",
-        description: "Please fill in the name and email fields.",
-        variant: "destructive",
-      })
+    if (!newContact.name.trim() || !newContact.email.trim()) {
+      alert("Please fill in the name and email fields.")
       return
     }
 
-    const tags = formData.tags
+    const tags = newContact.tags
       .split(",")
       .map((tag) => tag.trim())
       .filter((tag) => tag.length > 0)
 
     const contactData = {
-      name: formData.name,
-      email: formData.email,
-      phone: formData.phone,
-      company: formData.company,
-      jobTitle: formData.jobTitle,
-      status: formData.status,
-      website: formData.website,
+      name: newContact.name,
+      email: newContact.email,
+      phone: newContact.phone,
+      company: newContact.company,
+      position: newContact.position,
+      status: newContact.status,
+      website: newContact.website,
       tags: tags,
-      notes: formData.notes,
     }
 
     try {
-      let response
+      setSaving(true)
+
       if (editingContact) {
-        response = await fetch(`/api/contacts/${editingContact}`, {
-          method: "PATCH",
+        // Update existing contact
+        const response = await fetch(`/api/contacts/${editingContact}`, {
+          method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(contactData),
         })
+
+        const result = await response.json()
+        if (result.success) {
+          await fetchContacts() // Refresh the list
+        } else {
+          alert("Failed to update contact: " + result.error)
+          return
+        }
       } else {
-        response = await fetch("/api/contacts", {
+        // Create new contact
+        const response = await fetch("/api/contacts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(contactData),
         })
+
+        const result = await response.json()
+        if (result.success) {
+          await fetchContacts() // Refresh the list
+        } else {
+          alert("Failed to create contact: " + result.error)
+          return
+        }
       }
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to save contact")
-      }
-
-      const result = await response.json()
-      console.log("Contact saved successfully:", result)
-      mutateContacts()
       setIsDialogOpen(false)
       resetForm()
-      toast({
-        title: "Success",
-        description: editingContact ? "Contact updated successfully" : "Contact created successfully",
-      })
     } catch (error) {
       console.error("Error saving contact:", error)
-      toast({
-        title: "Error",
-        description: `Failed to save contact: ${error.message}`,
-        variant: "destructive",
-      })
+      alert("An error occurred while saving the contact")
+    } finally {
+      setSaving(false)
     }
   }
 
   const deleteContact = async (contactId: string) => {
-    if (confirm("Are you sure you want to delete this contact?")) {
-      try {
-        const response = await fetch(`/api/contacts/${contactId}`, {
-          method: "DELETE",
-        })
+    if (!confirm("Are you sure you want to delete this contact?")) {
+      return
+    }
 
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || "Failed to delete contact")
-        }
+    try {
+      const response = await fetch(`/api/contacts/${contactId}`, {
+        method: "DELETE",
+      })
 
-        const result = await response.json()
-        console.log("Contact deleted successfully:", result)
-        mutateContacts()
-        toast({
-          title: "Success",
-          description: "Contact deleted successfully",
-        })
-      } catch (error) {
-        console.error("Error deleting contact:", error)
-        toast({
-          title: "Error",
-          description: `Failed to delete contact: ${error.message}`,
-          variant: "destructive",
-        })
+      const result = await response.json()
+      if (result.success) {
+        await fetchContacts() // Refresh the list
+      } else {
+        alert("Failed to delete contact: " + result.error)
       }
+    } catch (error) {
+      console.error("Error deleting contact:", error)
+      alert("An error occurred while deleting the contact")
     }
   }
 
@@ -319,28 +237,25 @@ export default function ContactsPage() {
     return [...contactsToSort].sort((a, b) => {
       switch (sortBy) {
         case "name":
-          return a.name.localeCompare(b.name)
+          return (a.name || "").localeCompare(b.name || "")
         case "company":
-          return a.company.localeCompare(b.company)
+          return (a.company || "").localeCompare(b.company || "")
         case "status":
-          return a.status.localeCompare(b.status)
+          return (a.status || "").localeCompare(b.status || "")
         case "createdDate":
-          return (
-            new Date(b.createdAt || b.createdDate || "").getTime() -
-            new Date(a.createdAt || a.createdDate || "").getTime()
-          )
+          return new Date(b.createdDate || 0).getTime() - new Date(a.createdDate || 0).getTime()
         default:
           return 0
       }
     })
   }
 
-  const filteredContacts = contacts.filter((contact: any) => {
+  const filteredContacts = contacts.filter((contact) => {
     const matchesSearch =
-      contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.jobTitle.toLowerCase().includes(searchTerm.toLowerCase())
+      (contact.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (contact.company || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (contact.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (contact.position || "").toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesStatus = statusFilter === "all" || contact.status === statusFilter
 
@@ -349,8 +264,16 @@ export default function ContactsPage() {
 
   const sortedContacts = sortContacts(filteredContacts)
 
-  if (error) return <div>Failed to load contacts</div>
-  if (!contacts) return <div>Loading...</div>
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading contacts...</span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -378,7 +301,7 @@ export default function ContactsPage() {
           <CardContent className="p-0 pt-2">
             <div className="text-lg md:text-2xl font-bold">{contacts.length}</div>
             <p className="text-xs text-muted-foreground">
-              <span className="text-green-600">+{contacts.filter((c: any) => c.status === "Customer").length}</span>{" "}
+              <span className="text-green-600">+{contacts.filter((c) => c.status === "Customer").length}</span>{" "}
               customers
             </p>
           </CardContent>
@@ -391,7 +314,7 @@ export default function ContactsPage() {
           </CardHeader>
           <CardContent className="p-0 pt-2">
             <div className="text-lg md:text-2xl font-bold">
-              {contacts.filter((c: any) => c.status === "Hot Lead").length}
+              {contacts.filter((c) => c.status === "Hot Lead").length}
             </div>
             <p className="text-xs text-muted-foreground">High priority contacts</p>
           </CardContent>
@@ -403,7 +326,9 @@ export default function ContactsPage() {
             <Building2 className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent className="p-0 pt-2">
-            <div className="text-lg md:text-2xl font-bold">{new Set(contacts.map((c: any) => c.company)).size}</div>
+            <div className="text-lg md:text-2xl font-bold">
+              {new Set(contacts.map((c) => c.company).filter(Boolean)).size}
+            </div>
             <p className="text-xs text-muted-foreground">Unique organizations</p>
           </CardContent>
         </Card>
@@ -417,8 +342,7 @@ export default function ContactsPage() {
             <div className="text-lg md:text-2xl font-bold">
               {
                 contacts.filter(
-                  (c: any) =>
-                    new Date(c.createdAt || c.createdDate || "") > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+                  (c) => c.createdDate && new Date(c.createdDate) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
                 ).length
               }
             </div>
@@ -506,23 +430,23 @@ export default function ContactsPage() {
           {viewMode === "grid" ? (
             /* Grid View - Mobile Responsive */
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {sortedContacts.map((contact: any) => (
-                <Card key={contact._id || contact.id} className="hover:shadow-md transition-shadow">
+              {sortedContacts.map((contact) => (
+                <Card key={contact.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center space-x-3">
                         <Avatar className="h-10 w-10">
                           <AvatarImage src={contact.avatar || "/placeholder.svg"} />
                           <AvatarFallback>
-                            {contact.name
+                            {(contact.name || "")
                               .split(" ")
-                              .map((n: string) => n[0])
+                              .map((n) => n[0])
                               .join("")}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <h3 className="font-medium text-sm truncate">{contact.name}</h3>
-                          <p className="text-xs text-muted-foreground truncate">{contact.jobTitle}</p>
+                          <p className="text-xs text-muted-foreground truncate">{contact.position}</p>
                         </div>
                       </div>
                       <DropdownMenu>
@@ -548,10 +472,7 @@ export default function ContactsPage() {
                             <Plus className="mr-2 h-4 w-4" />
                             Create Deal
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => deleteContact(contact._id || contact.id)}
-                            className="text-red-600"
-                          >
+                          <DropdownMenuItem onClick={() => deleteContact(contact.id)} className="text-red-600">
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete Contact
                           </DropdownMenuItem>
@@ -578,7 +499,9 @@ export default function ContactsPage() {
                       <Badge className={getStatusColor(contact.status)} variant="secondary">
                         {contact.status}
                       </Badge>
-                      <span className="text-xs text-muted-foreground">{contact.lastContact}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {contact.lastContact ? new Date(contact.lastContact).toLocaleDateString() : "No contact yet"}
+                      </span>
                     </div>
 
                     <div className="mt-2 flex flex-wrap gap-1">
@@ -589,7 +512,7 @@ export default function ContactsPage() {
                       ))}
                       {(contact.tags || []).length > 2 && (
                         <Badge variant="outline" className="text-xs">
-                          +{(contact.tags || []).length - 2}
+                          +{contact.tags.length - 2}
                         </Badge>
                       )}
                     </div>
@@ -613,26 +536,27 @@ export default function ContactsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedContacts.map((contact: any) => (
-                    <TableRow key={contact._id || contact.id}>
+                  {sortedContacts.map((contact) => (
+                    <TableRow key={contact.id}>
                       <TableCell>
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-8 w-8 md:h-10 md:w-10">
                             <AvatarImage src={contact.avatar || "/placeholder.svg"} />
                             <AvatarFallback className="text-xs">
-                              {contact.name
+                              {(contact.name || "")
                                 .split(" ")
-                                .map((n: string) => n[0])
+                                .map((n) => n[0])
                                 .join("")}
                             </AvatarFallback>
                           </Avatar>
                           <div className="min-w-0">
                             <div className="font-medium text-sm">{contact.name}</div>
                             <div className="text-xs text-muted-foreground md:hidden">
-                              {contact.company} • {contact.jobTitle}
+                              {contact.company} • {contact.position}
                             </div>
                             <div className="text-xs text-muted-foreground lg:hidden">
-                              Added {new Date(contact.createdAt || contact.createdDate || "").toLocaleDateString()}
+                              Added{" "}
+                              {contact.createdDate ? new Date(contact.createdDate).toLocaleDateString() : "Unknown"}
                             </div>
                           </div>
                         </div>
@@ -643,7 +567,7 @@ export default function ContactsPage() {
                             <Building2 className="h-4 w-4 text-muted-foreground" />
                             <span className="font-medium text-sm">{contact.company}</span>
                           </div>
-                          <div className="text-xs text-muted-foreground">{contact.jobTitle}</div>
+                          <div className="text-xs text-muted-foreground">{contact.position}</div>
                         </div>
                       </TableCell>
                       <TableCell className="hidden lg:table-cell">
@@ -672,13 +596,13 @@ export default function ContactsPage() {
                           ))}
                           {(contact.tags || []).length > 2 && (
                             <Badge variant="outline" className="text-xs">
-                              +{(contact.tags || []).length - 2}
+                              +{contact.tags.length - 2}
                             </Badge>
                           )}
                         </div>
                       </TableCell>
                       <TableCell className="hidden sm:table-cell text-xs text-muted-foreground">
-                        {contact.lastContact}
+                        {contact.lastContact ? new Date(contact.lastContact).toLocaleDateString() : "No contact yet"}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
@@ -704,10 +628,7 @@ export default function ContactsPage() {
                               <Plus className="mr-2 h-4 w-4" />
                               Create Deal
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => deleteContact(contact._id || contact.id)}
-                              className="text-red-600"
-                            >
+                            <DropdownMenuItem onClick={() => deleteContact(contact.id)} className="text-red-600">
                               <Trash2 className="mr-2 h-4 w-4" />
                               Delete Contact
                             </DropdownMenuItem>
@@ -740,8 +661,8 @@ export default function ContactsPage() {
               <Label htmlFor="name">Name *</Label>
               <Input
                 id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                value={newContact.name}
+                onChange={(e) => setNewContact({ ...newContact, name: e.target.value })}
                 placeholder="Enter full name"
               />
             </div>
@@ -749,17 +670,17 @@ export default function ContactsPage() {
               <Label htmlFor="company">Company</Label>
               <Input
                 id="company"
-                value={formData.company}
-                onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                value={newContact.company}
+                onChange={(e) => setNewContact({ ...newContact, company: e.target.value })}
                 placeholder="Enter company name"
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="jobTitle">Job Title</Label>
+              <Label htmlFor="position">Job Title</Label>
               <Input
-                id="jobTitle"
-                value={formData.jobTitle}
-                onChange={(e) => setFormData({ ...formData, jobTitle: e.target.value })}
+                id="position"
+                value={newContact.position}
+                onChange={(e) => setNewContact({ ...newContact, position: e.target.value })}
                 placeholder="Enter job title or position"
               />
             </div>
@@ -768,8 +689,8 @@ export default function ContactsPage() {
               <Input
                 id="email"
                 type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                value={newContact.email}
+                onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
                 placeholder="Enter email address"
               />
             </div>
@@ -778,15 +699,18 @@ export default function ContactsPage() {
               <Input
                 id="phone"
                 type="tel"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                value={newContact.phone}
+                onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
                 placeholder="Enter phone number"
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="status">Status</Label>
-                <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+                <Select
+                  value={newContact.status}
+                  onValueChange={(value) => setNewContact({ ...newContact, status: value })}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -804,8 +728,8 @@ export default function ContactsPage() {
                 <Input
                   id="website"
                   type="url"
-                  value={formData.website}
-                  onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                  value={newContact.website}
+                  onChange={(e) => setNewContact({ ...newContact, website: e.target.value })}
                   placeholder="https://company.com"
                 />
               </div>
@@ -814,18 +738,9 @@ export default function ContactsPage() {
               <Label htmlFor="tags">Tags (comma separated)</Label>
               <Input
                 id="tags"
-                value={formData.tags}
-                onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+                value={newContact.tags}
+                onChange={(e) => setNewContact({ ...newContact, tags: e.target.value })}
                 placeholder="e.g. Enterprise, Decision Maker, Technical"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Input
-                id="notes"
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Enter any notes"
               />
             </div>
           </div>
@@ -833,12 +748,24 @@ export default function ContactsPage() {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button onClick={handleSaveContact} className="w-full sm:w-auto">
-              {editingContact ? "Update Contact" : "Add Person"}
+            <Button onClick={handleSaveContact} disabled={saving} className="w-full sm:w-auto">
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {editingContact ? "Updating..." : "Adding..."}
+                </>
+              ) : editingContact ? (
+                "Update Contact"
+              ) : (
+                "Add Person"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Contact Profile Dialog */}
+      <ContactProfileDialog contact={selectedContact} isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
     </div>
   )
 }
