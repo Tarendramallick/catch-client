@@ -155,6 +155,10 @@ export default function CompaniesPage() {
   }
 
   const openEditCompanyDialog = (company: any) => {
+    console.log("[v0] Opening edit dialog for company:", company)
+    console.log("[v0] Company _id:", company._id)
+    console.log("[v0] Company id:", company.id)
+
     setNewCompany({
       name: company.name,
       industry: company.industry,
@@ -167,7 +171,9 @@ export default function CompaniesPage() {
       foundedYear: company.foundedYear?.toString() || "",
       status: company.status,
     })
-    setEditingCompany(company._id || company.id)
+    const companyId = company.id || company._id
+    console.log("[v0] Setting editingCompany to:", companyId)
+    setEditingCompany(companyId)
     setIsDialogOpen(true)
   }
 
@@ -191,8 +197,12 @@ export default function CompaniesPage() {
     }
 
     try {
+      console.log("[v0] Saving company with ID:", editingCompany)
+      console.log("[v0] Company data:", companyData)
+
       let response
       if (editingCompany) {
+        console.log("[v0] Making PUT request to:", `/api/companies/${editingCompany}`)
         response = await fetch(`/api/companies/${editingCompany}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -206,11 +216,17 @@ export default function CompaniesPage() {
         })
       }
 
+      console.log("[v0] Response status:", response.status)
+      console.log("[v0] Response ok:", response.ok)
+
       if (!response.ok) {
         const errorData = await response.json()
+        console.log("[v0] Error response data:", errorData)
         throw new Error(errorData.error || "Failed to save company")
       }
 
+      const responseData = await response.json()
+      console.log("[v0] Success response data:", responseData)
       console.log("Company saved successfully")
       mutate() // Refresh data
       setIsDialogOpen(false)
