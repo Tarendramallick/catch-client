@@ -32,11 +32,14 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
 // PUT /api/companies/[id]
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    console.log("[companies.PUT] Updating company with ID:", params.id)
+    console.log("[v0] [companies.PUT] Updating company with ID:", params.id)
     const oid = toObjectId(params.id)
+    console.log("[v0] [companies.PUT] ObjectId validation result:", oid)
     if (!oid) return NextResponse.json({ success: false, error: "Invalid id" }, { status: 400 })
 
     const body = await request.json()
+    console.log("[v0] [companies.PUT] Request body:", body)
+
     const $set: Record<string, any> = {}
 
     // Allow partial updates
@@ -60,21 +63,35 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     for (const f of fields) if (f in body) $set[f] = body[f]
 
     $set.updatedDate = new Date()
+    console.log("[v0] [companies.PUT] Update data:", $set)
 
     const col = await getCompaniesCollection()
+    console.log("[v0] [companies.PUT] Got collection, searching for document with _id:", oid)
+
+    const existingDoc = await col.findOne({ _id: oid })
+    console.log("[v0] [companies.PUT] Existing document found:", existingDoc ? "YES" : "NO")
+    if (existingDoc) {
+      console.log("[v0] [companies.PUT] Existing document _id:", existingDoc._id)
+    }
+
     const result = await col.findOneAndUpdate({ _id: oid }, { $set }, { returnDocument: "after" })
+    console.log("[v0] [companies.PUT] Update result:", result)
+
     const updated = result.value
-    if (!updated) return NextResponse.json({ success: false, error: "Company not found" }, { status: 404 })
+    if (!updated) {
+      console.log("[v0] [companies.PUT] No document returned from update")
+      return NextResponse.json({ success: false, error: "Company not found" }, { status: 404 })
+    }
 
     const { _id, ...companyData } = updated
-    console.log("[companies.PUT] Company updated successfully:", _id)
+    console.log("[v0] [companies.PUT] Company updated successfully:", _id)
     return NextResponse.json({
       success: true,
       data: { id: String(_id), ...companyData },
       message: "Company updated successfully",
     })
   } catch (error) {
-    console.error("[companies.PUT] error:", error)
+    console.error("[v0] [companies.PUT] error:", error)
     return NextResponse.json({ success: false, error: "Failed to update company" }, { status: 500 })
   }
 }
@@ -84,9 +101,12 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   try {
     console.log("[companies.PATCH] Updating company with ID:", params.id)
     const oid = toObjectId(params.id)
+    console.log("[companies.PATCH] ObjectId validation result:", oid)
     if (!oid) return NextResponse.json({ success: false, error: "Invalid id" }, { status: 400 })
 
     const body = await request.json()
+    console.log("[companies.PATCH] Request body:", body)
+
     const $set: Record<string, any> = {}
 
     // Allow partial updates
@@ -110,11 +130,25 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     for (const f of fields) if (f in body) $set[f] = body[f]
 
     $set.updatedDate = new Date()
+    console.log("[companies.PATCH] Update data:", $set)
 
     const col = await getCompaniesCollection()
+    console.log("[companies.PATCH] Got collection, searching for document with _id:", oid)
+
+    const existingDoc = await col.findOne({ _id: oid })
+    console.log("[companies.PATCH] Existing document found:", existingDoc ? "YES" : "NO")
+    if (existingDoc) {
+      console.log("[companies.PATCH] Existing document _id:", existingDoc._id)
+    }
+
     const result = await col.findOneAndUpdate({ _id: oid }, { $set }, { returnDocument: "after" })
+    console.log("[companies.PATCH] Update result:", result)
+
     const updated = result.value
-    if (!updated) return NextResponse.json({ success: false, error: "Company not found" }, { status: 404 })
+    if (!updated) {
+      console.log("[companies.PATCH] No document returned from update")
+      return NextResponse.json({ success: false, error: "Company not found" }, { status: 404 })
+    }
 
     const { _id, ...companyData } = updated
     console.log("[companies.PATCH] Company updated successfully:", _id)
