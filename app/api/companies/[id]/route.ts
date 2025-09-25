@@ -12,6 +12,7 @@ function toObjectId(id: string) {
 // GET /api/companies/[id]
 export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
   try {
+    console.log("[companies.GET] Fetching company with ID:", params.id)
     const oid = toObjectId(params.id)
     if (!oid) return NextResponse.json({ success: false, error: "Invalid id" }, { status: 400 })
 
@@ -19,7 +20,9 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
     const doc = await col.findOne({ _id: oid })
     if (!doc) return NextResponse.json({ success: false, error: "Company not found" }, { status: 404 })
 
-    return NextResponse.json({ success: true, data: { id: String(doc._id), ...doc } })
+    const { _id, ...companyData } = doc
+    console.log("[companies.GET] Company found successfully:", _id)
+    return NextResponse.json({ success: true, data: { id: String(_id), ...companyData } })
   } catch (error) {
     console.error("[companies.GET] error:", error)
     return NextResponse.json({ success: false, error: "Failed to fetch company" }, { status: 500 })
@@ -29,6 +32,7 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
 // PUT /api/companies/[id]
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
+    console.log("[companies.PUT] Updating company with ID:", params.id)
     const oid = toObjectId(params.id)
     if (!oid) return NextResponse.json({ success: false, error: "Invalid id" }, { status: 400 })
 
@@ -36,7 +40,23 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const $set: Record<string, any> = {}
 
     // Allow partial updates
-    const fields = ["name", "industry", "size", "website", "phone", "email", "address", "status", "description"]
+    const fields = [
+      "name",
+      "industry",
+      "size",
+      "website",
+      "phone",
+      "email",
+      "address",
+      "status",
+      "description",
+      "estimatedARR",
+      "employees",
+      "location",
+      "foundedYear",
+      "linkedinUrl",
+      "domain",
+    ]
     for (const f of fields) if (f in body) $set[f] = body[f]
 
     $set.updatedDate = new Date()
@@ -46,10 +66,11 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const updated = result.value
     if (!updated) return NextResponse.json({ success: false, error: "Company not found" }, { status: 404 })
 
-    console.log("[companies.PUT] Company updated successfully:", updated._id)
+    const { _id, ...companyData } = updated
+    console.log("[companies.PUT] Company updated successfully:", _id)
     return NextResponse.json({
       success: true,
-      data: { id: String(updated._id), ...updated },
+      data: { id: String(_id), ...companyData },
       message: "Company updated successfully",
     })
   } catch (error) {
@@ -61,6 +82,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 // PATCH /api/companies/[id]
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   try {
+    console.log("[companies.PATCH] Updating company with ID:", params.id)
     const oid = toObjectId(params.id)
     if (!oid) return NextResponse.json({ success: false, error: "Invalid id" }, { status: 400 })
 
@@ -68,7 +90,23 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const $set: Record<string, any> = {}
 
     // Allow partial updates
-    const fields = ["name", "industry", "size", "website", "phone", "email", "address", "status", "description"]
+    const fields = [
+      "name",
+      "industry",
+      "size",
+      "website",
+      "phone",
+      "email",
+      "address",
+      "status",
+      "description",
+      "estimatedARR",
+      "employees",
+      "location",
+      "foundedYear",
+      "linkedinUrl",
+      "domain",
+    ]
     for (const f of fields) if (f in body) $set[f] = body[f]
 
     $set.updatedDate = new Date()
@@ -78,10 +116,11 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const updated = result.value
     if (!updated) return NextResponse.json({ success: false, error: "Company not found" }, { status: 404 })
 
-    console.log("[companies.PATCH] Company updated successfully:", updated._id)
+    const { _id, ...companyData } = updated
+    console.log("[companies.PATCH] Company updated successfully:", _id)
     return NextResponse.json({
       success: true,
-      data: { id: String(updated._id), ...updated },
+      data: { id: String(_id), ...companyData },
       message: "Company updated successfully",
     })
   } catch (error) {
