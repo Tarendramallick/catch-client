@@ -20,7 +20,8 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
     if (!doc) return NextResponse.json({ success: false, error: "Company not found" }, { status: 404 })
 
     return NextResponse.json({ success: true, data: { id: String(doc._id), ...doc } })
-  } catch {
+  } catch (error) {
+    console.error("[companies.GET] error:", error)
     return NextResponse.json({ success: false, error: "Failed to fetch company" }, { status: 500 })
   }
 }
@@ -45,12 +46,14 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const updated = result.value
     if (!updated) return NextResponse.json({ success: false, error: "Company not found" }, { status: 404 })
 
+    console.log("[companies.PUT] Company updated successfully:", updated._id)
     return NextResponse.json({
       success: true,
       data: { id: String(updated._id), ...updated },
       message: "Company updated successfully",
     })
-  } catch {
+  } catch (error) {
+    console.error("[companies.PUT] error:", error)
     return NextResponse.json({ success: false, error: "Failed to update company" }, { status: 500 })
   }
 }
@@ -75,12 +78,14 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const updated = result.value
     if (!updated) return NextResponse.json({ success: false, error: "Company not found" }, { status: 404 })
 
+    console.log("[companies.PATCH] Company updated successfully:", updated._id)
     return NextResponse.json({
       success: true,
       data: { id: String(updated._id), ...updated },
       message: "Company updated successfully",
     })
-  } catch {
+  } catch (error) {
+    console.error("[companies.PATCH] error:", error)
     return NextResponse.json({ success: false, error: "Failed to update company" }, { status: 500 })
   }
 }
@@ -95,8 +100,10 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
     const res = await col.deleteOne({ _id: oid })
     if (!res.deletedCount) return NextResponse.json({ success: false, error: "Company not found" }, { status: 404 })
 
+    console.log("[companies.DELETE] Company deleted successfully:", params.id)
     return NextResponse.json({ success: true, message: "Company deleted successfully" })
-  } catch {
+  } catch (error) {
+    console.error("[companies.DELETE] error:", error)
     return NextResponse.json({ success: false, error: "Failed to delete company" }, { status: 500 })
   }
 }
