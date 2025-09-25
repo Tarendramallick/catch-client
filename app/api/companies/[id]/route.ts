@@ -4,27 +4,40 @@ import { getCompaniesCollection } from "@/lib/database/collections"
 
 export const dynamic = "force-dynamic"
 
-function toObjectId(id: string) {
-  if (!ObjectId.isValid(id)) return null
-  return new ObjectId(id)
+// Helper that works with both ObjectId and string IDs
+function parseId(id: string) {
+  if (ObjectId.isValid(id)) {
+    console.log("[parseId] Detected valid ObjectId:", id)
+    return new ObjectId(id)
+  }
+  console.log("[parseId] Treating id as plain string:", id)
+  return id
 }
 
 // GET /api/companies/[id]
 export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
   try {
     console.log("[companies.GET] Fetching company with ID:", params.id)
-    const oid = toObjectId(params.id)
-    if (!oid) return NextResponse.json({ success: false, error: "Invalid id" }, { status: 400 })
+
+    const parsedId = parseId(params.id)
+    console.log("[companies.GET] Parsed ID type:", typeof parsedId)
 
     const col = await getCompaniesCollection()
-    const doc = await col.findOne({ _id: oid })
-    if (!doc) return NextResponse.json({ success: false, error: "Company not found" }, { status: 404 })
+    console.log("[companies.GET] Got companies collection")
+
+    const doc = await col.findOne({ _id: parsedId })
+    console.log("[companies.GET] Document found:", doc ? "YES" : "NO")
+
+    if (!doc) {
+      return NextResponse.json({ success: false, error: "Company not found" }, { status: 404 })
+    }
 
     const { _id, ...companyData } = doc
-    console.log("[companies.GET] Company found successfully:", _id)
+    console.log("[companies.GET] Company fetched successfully:", _id.toString())
+
     return NextResponse.json({ success: true, data: { id: String(_id), ...companyData } })
   } catch (error) {
-    console.error("[companies.GET] error:", error)
+    console.error("[companies.GET] CRITICAL ERROR:", error)
     return NextResponse.json({ success: false, error: "Failed to fetch company" }, { status: 500 })
   }
 }
@@ -33,89 +46,56 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     console.log("=== [v0] COMPANIES PUT API CALLED ===")
-    console.log("[v0] [companies.PUT] Updating company with ID:", params.id)
-    console.log("[v0] [companies.PUT] ID length:", params.id.length)
-    console.log("[v0] [companies.PUT] ID type:", typeof params.id)
+    console.log("[companies.PUT] Updating company with ID:", params.id)
 
-    const oid = toObjectId(params.id)
-    console.log("[v0] [companies.PUT] ObjectId validation result:", oid)
-    console.log("[v0] [companies.PUT] ObjectId valid:", ObjectId.isValid(params.id))
-
-    if (!oid) {
-      console.log("[v0] [companies.PUT] Invalid ObjectId, returning 400")
-      return NextResponse.json({ success: false, error: "Invalid id" }, { status: 400 })
-    }
+    const parsedId = parseId(params.id)
 
     const body = await request.json()
-    console.log("[v0] [companies.PUT] Request body:", JSON.stringify(body, null, 2))
+    console.log("[companies.PUT] Request body:", JSON.stringify(body, null, 2))
 
     const $set: Record<string, any> = {}
-
-    // Allow partial updates
     const fields = [
-      "name",
-      "industry",
-      "size",
-      "website",
-      "phone",
-      "email",
-      "address",
-      "status",
-      "description",
-      "estimatedARR",
-      "employees",
-      "location",
-      "foundedYear",
-      "linkedinUrl",
-      "domain",
+      "name", "industry", "size", "website", "phone", "email", "address",
+      "status", "description", "estimatedARR", "employees", "location",
+      "foundedYear", "linkedinUrl", "domain",
     ]
     for (const f of fields) if (f in body) $set[f] = body[f]
 
     $set.updatedDate = new Date()
-    console.log("[v0] [companies.PUT] Update data:", JSON.stringify($set, null, 2))
+    console.log("[companies.PUT] Update data:", JSON.stringify($set, null, 2))
 
-    console.log("[v0] [companies.PUT] Getting companies collection...")
     const col = await getCompaniesCollection()
-    console.log("[v0] [companies.PUT] Got collection successfully")
-    console.log("[v0] [companies.PUT] Searching for document with _id:", oid.toString())
+    console.log("[companies.PUT] Got companies collection")
 
-    // Check if document exists first
-    const existingDoc = await col.findOne({ _id: oid })
-    console.log("[v0] [companies.PUT] Existing document found:", existingDoc ? "YES" : "NO")
-    if (existingDoc) {
-      console.log("[v0] [companies.PUT] Existing document _id:", existingDoc._id.toString())
-      console.log("[v0] [companies.PUT] Existing document name:", existingDoc.name)
-    } else {
-      console.log("[v0] [companies.PUT] NO DOCUMENT FOUND - this is the problem!")
-      // Let's also try to find any document to see if the collection is working
-      const anyDoc = await col.findOne({})
-      console.log("[v0] [companies.PUT] Any document in collection:", anyDoc ? "YES" : "NO")
-      if (anyDoc) {
-        console.log("[v0] [companies.PUT] Sample document _id:", anyDoc._id.toString())
-      }
-    }
+    const existingDoc = await col.findOne({ _id: parsedId })
+    console.log("[companies.PUT] Existing document found:", existingDoc ? "YES" : "NO")
 
-    console.log("[v0] [companies.PUT] Performing findOneAndUpdate...")
-    const result = await col.findOneAndUpdate({ _id: oid }, { $set }, { returnDocument: "after" })
-    console.log("[v0] [companies.PUT] Update result:", result)
-    console.log("[v0] [companies.PUT] Update result value:", result.value)
-
-    const updated = result.value
-    if (!updated) {
-      console.log("[v0] [companies.PUT] No document returned from update - returning 404")
+    if (!existingDoc) {
+      console.log("[companies.PUT] No document found with ID:", params.id)
       return NextResponse.json({ success: false, error: "Company not found" }, { status: 404 })
     }
 
-    const { _id, ...companyData } = updated
-    console.log("[v0] [companies.PUT] Company updated successfully:", _id.toString())
+    const result = await col.findOneAndUpdate(
+      { _id: parsedId },
+      { $set },
+      { returnDocument: "after" }
+    )
+    console.log("[companies.PUT] Update result value:", result.value ? "FOUND" : "NOT FOUND")
+
+    if (!result.value) {
+      return NextResponse.json({ success: false, error: "Company not found" }, { status: 404 })
+    }
+
+    const { _id, ...companyData } = result.value
+    console.log("[companies.PUT] Company updated successfully:", _id.toString())
+
     return NextResponse.json({
       success: true,
       data: { id: String(_id), ...companyData },
       message: "Company updated successfully",
     })
   } catch (error) {
-    console.error("[v0] [companies.PUT] CRITICAL ERROR:", error)
-    console.error("[v0] [companies.PUT] Error stack:", error instanceof Error ? error.stack : "No stack trace")
+    console.error("[companies.PUT] CRITICAL ERROR:", error)
     return NextResponse.json({ success: false, error: "Failed to update company" }, { status: 500 })
   }
 }
@@ -124,77 +104,48 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     console.log("[companies.PATCH] Updating company with ID:", params.id)
-    const oid = toObjectId(params.id)
-    console.log("[companies.PATCH] ObjectId validation result:", oid)
-    console.log("[companies.PATCH] ObjectId valid:", ObjectId.isValid(params.id))
 
-    if (!oid) {
-      console.log("[companies.PATCH] Invalid ObjectId, returning 400")
-      return NextResponse.json({ success: false, error: "Invalid id" }, { status: 400 })
-    }
+    const parsedId = parseId(params.id)
 
     const body = await request.json()
     console.log("[companies.PATCH] Request body:", JSON.stringify(body, null, 2))
 
     const $set: Record<string, any> = {}
-
-    // Allow partial updates
     const fields = [
-      "name",
-      "industry",
-      "size",
-      "website",
-      "phone",
-      "email",
-      "address",
-      "status",
-      "description",
-      "estimatedARR",
-      "employees",
-      "location",
-      "foundedYear",
-      "linkedinUrl",
-      "domain",
+      "name", "industry", "size", "website", "phone", "email", "address",
+      "status", "description", "estimatedARR", "employees", "location",
+      "foundedYear", "linkedinUrl", "domain",
     ]
     for (const f of fields) if (f in body) $set[f] = body[f]
 
     $set.updatedDate = new Date()
     console.log("[companies.PATCH] Update data:", JSON.stringify($set, null, 2))
 
-    console.log("[companies.PATCH] Getting companies collection...")
     const col = await getCompaniesCollection()
-    console.log("[companies.PATCH] Got collection successfully")
-    console.log("[companies.PATCH] Searching for document with _id:", oid.toString())
+    console.log("[companies.PATCH] Got companies collection")
 
-    // Check if document exists first
-    const existingDoc = await col.findOne({ _id: oid })
+    const existingDoc = await col.findOne({ _id: parsedId })
     console.log("[companies.PATCH] Existing document found:", existingDoc ? "YES" : "NO")
-    if (existingDoc) {
-      console.log("[companies.PATCH] Existing document _id:", existingDoc._id.toString())
-      console.log("[companies.PATCH] Existing document name:", existingDoc.name)
-    } else {
-      console.log("[companies.PATCH] NO DOCUMENT FOUND - this is the problem!")
-      // Let's also try to find any document to see if the collection is working
-      const anyDoc = await col.findOne({})
-      console.log("[companies.PATCH] Any document in collection:", anyDoc ? "YES" : "NO")
-      if (anyDoc) {
-        console.log("[companies.PATCH] Sample document _id:", anyDoc._id.toString())
-      }
-    }
 
-    console.log("[companies.PATCH] Performing findOneAndUpdate...")
-    const result = await col.findOneAndUpdate({ _id: oid }, { $set }, { returnDocument: "after" })
-    console.log("[companies.PATCH] Update result:", result)
-    console.log("[companies.PATCH] Update result value:", result.value)
-
-    const updated = result.value
-    if (!updated) {
-      console.log("[companies.PATCH] No document returned from update - returning 404")
+    if (!existingDoc) {
+      console.log("[companies.PATCH] No document found with ID:", params.id)
       return NextResponse.json({ success: false, error: "Company not found" }, { status: 404 })
     }
 
-    const { _id, ...companyData } = updated
+    const result = await col.findOneAndUpdate(
+      { _id: parsedId },
+      { $set },
+      { returnDocument: "after" }
+    )
+    console.log("[companies.PATCH] Update result value:", result.value ? "FOUND" : "NOT FOUND")
+
+    if (!result.value) {
+      return NextResponse.json({ success: false, error: "Company not found" }, { status: 404 })
+    }
+
+    const { _id, ...companyData } = result.value
     console.log("[companies.PATCH] Company updated successfully:", _id.toString())
+
     return NextResponse.json({
       success: true,
       data: { id: String(_id), ...companyData },
@@ -202,7 +153,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     })
   } catch (error) {
     console.error("[companies.PATCH] CRITICAL ERROR:", error)
-    console.error("[companies.PATCH] Error stack:", error instanceof Error ? error.stack : "No stack trace")
     return NextResponse.json({ success: false, error: "Failed to update company" }, { status: 500 })
   }
 }
@@ -210,17 +160,24 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 // DELETE /api/companies/[id]
 export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const oid = toObjectId(params.id)
-    if (!oid) return NextResponse.json({ success: false, error: "Invalid id" }, { status: 400 })
+    console.log("[companies.DELETE] Deleting company with ID:", params.id)
+
+    const parsedId = parseId(params.id)
 
     const col = await getCompaniesCollection()
-    const res = await col.deleteOne({ _id: oid })
-    if (!res.deletedCount) return NextResponse.json({ success: false, error: "Company not found" }, { status: 404 })
+    console.log("[companies.DELETE] Got companies collection")
+
+    const res = await col.deleteOne({ _id: parsedId })
+    console.log("[companies.DELETE] Delete result:", res.deletedCount)
+
+    if (!res.deletedCount) {
+      return NextResponse.json({ success: false, error: "Company not found" }, { status: 404 })
+    }
 
     console.log("[companies.DELETE] Company deleted successfully:", params.id)
     return NextResponse.json({ success: true, message: "Company deleted successfully" })
   } catch (error) {
-    console.error("[companies.DELETE] error:", error)
+    console.error("[companies.DELETE] CRITICAL ERROR:", error)
     return NextResponse.json({ success: false, error: "Failed to delete company" }, { status: 500 })
   }
 }
