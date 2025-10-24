@@ -24,11 +24,11 @@ export default function RootLayout({
       <body className={inter.className}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="light" // Start with light theme
-          enableSystem={false} // Disable system preference for explicit control
+          defaultTheme="light"
+          enableSystem={false}
           disableTransitionOnChange={false}
-          storageKey="catchclients-theme" // Custom storage key for next-themes
-          themes={["light", "dark"]} // Explicitly define themes
+          storageKey="catchclients-theme"
+          themes={["light", "dark"]}
         >
           <OnboardingRedirect />
           <MainLayoutContent>{children}</MainLayoutContent>
