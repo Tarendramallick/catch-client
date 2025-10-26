@@ -117,7 +117,7 @@ const getTypeColor = (type: string) => {
   }
 }
 
-export function NotificationsPanel() {
+export function NotificationsPanel({ onClose }: { onClose?: () => void }) {
   const [notificationList, setNotificationList] = useState(notifications)
   const [showUnreadOnly, setShowUnreadOnly] = useState(false)
 
@@ -157,6 +157,11 @@ export function NotificationsPanel() {
             {unreadCount > 0 && (
               <Button variant="outline" size="sm" onClick={markAllAsRead}>
                 Mark All Read
+              </Button>
+            )}
+            {onClose && (
+              <Button variant="ghost" size="sm" onClick={onClose}>
+                <X className="h-4 w-4" />
               </Button>
             )}
           </div>
