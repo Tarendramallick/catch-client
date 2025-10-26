@@ -32,9 +32,7 @@ export default function Dashboard() {
   })
   const closedWonDeals = deals.filter((deal: any) => normalizeStage(deal.stage) === "closed-won")
   const closedLostDeals = deals.filter((deal: any) => normalizeStage(deal.stage) === "closed-lost")
-
   const totalRevenue = closedWonDeals.reduce((sum: number, deal: any) => sum + (deal.value || 0), 0)
-
   const conversionRate =
     closedWonDeals.length + closedLostDeals.length > 0
       ? (closedWonDeals.length / (closedWonDeals.length + closedLostDeals.length)) * 100
@@ -128,7 +126,8 @@ export default function Dashboard() {
       value: deal.value || 0,
       stage: deal.stage || "lead",
       probability: deal.probability || 0,
-      contact: deal.assignedTo || deal.assignee || "Unassigned",
+      contact:
+        deal.assignedTo || deal.assignee || users.find((u: any) => u._id === deal.assigneeId)?.name || "Unassigned",
       phone: "",
       email: "",
     }))
@@ -396,7 +395,15 @@ export default function Dashboard() {
       </Card>
 
       {/* Activity Feed */}
-      <ActivityFeed />
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base md:text-lg">Recent Activity</CardTitle>
+          <CardDescription className="text-sm">Latest updates across your CRM</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ActivityFeed />
+        </CardContent>
+      </Card>
     </div>
   )
 }
