@@ -17,8 +17,6 @@ const fetcher = async (url: string) => {
   return data.data || data
 }
 
-const normalizeStage = (s?: string) => (s || "").toLowerCase().replace(/\s+/g, "-")
-
 export default function Dashboard() {
   const { data: deals = [] } = useSWR("/api/deals", fetcher)
   const { data: tasks = [] } = useSWR("/api/tasks", fetcher)
@@ -26,17 +24,28 @@ export default function Dashboard() {
   const { data: users = [] } = useSWR("/api/users", fetcher)
   const { data: companies = [] } = useSWR("/api/companies", fetcher)
 
-  const activeDeals = deals.filter((deal: any) => {
-    const st = normalizeStage(deal.stage)
-    return st !== "closed-won" && st !== "closed-lost"
-  })
-  const closedWonDeals = deals.filter((deal: any) => normalizeStage(deal.stage) === "closed-won")
-  const closedLostDeals = deals.filter((deal: any) => normalizeStage(deal.stage) === "closed-lost")
+  const activeDeals = deals.filter((deal: any) => !["closed-won", "closed-lost"].includes(deal.stage?.toLowerCase()))
+  const closedWonDeals = deals.filter((deal: any) => deal.stage?.toLowerCase() === "closed-won")
   const totalRevenue = closedWonDeals.reduce((sum: number, deal: any) => sum + (deal.value || 0), 0)
-  const conversionRate =
-    closedWonDeals.length + closedLostDeals.length > 0
-      ? (closedWonDeals.length / (closedWonDeals.length + closedLostDeals.length)) * 100
-      : 0
+  const conversionRate = deals.length > 0 ? (closedWonDeals.length / deals.length) * 100 : 0
+
+  const recentDeals = deals
+    .sort(
+      (a: any, b: any) =>
+        new Date(b.updatedAt || b.createdAt || "").getTime() - new Date(a.updatedAt || a.createdAt || "").getTime(),
+    )
+    .slice(0, 3)
+    .map((deal: any) => ({
+      id: deal._id || deal.id,
+      name: deal.title || deal.name,
+      company: deal.client || deal.company,
+      value: deal.value || 0,
+      stage: deal.stage || "lead",
+      probability: deal.probability || 0,
+      contact: deal.assignee || "Unassigned",
+      phone: "",
+      email: "",
+    }))
 
   const upcomingTasks = tasks
     .filter((task: any) => !task.completed && task.status !== "completed")
@@ -51,34 +60,21 @@ export default function Dashboard() {
       company: task.client || "Unknown",
     }))
 
-  const taskCountsByUserId = new Map<string, { assigned: number; completed: number }>()
-  ;(tasks || []).forEach((t: any) => {
-    const userId = t.assigneeId || t.assignee || ""
-    const entry = taskCountsByUserId.get(userId) || { assigned: 0, completed: 0 }
-    entry.assigned += 1
-    if (t.completed || t.status === "completed") entry.completed += 1
-    taskCountsByUserId.set(userId, entry)
-  })
-
   const teamPerformance = users
     .map((user: any) => {
-      const userDeals = deals.filter(
-        (deal: any) => deal.assigneeId === user._id || deal.assignee === user.name || deal.assignedTo === user.name,
-      )
+      const userDeals = deals.filter((deal: any) => deal.assigneeId === user._id || deal.assignee === user.name)
       const userRevenue = userDeals
-        .filter((deal: any) => normalizeStage(deal.stage) === "closed-won")
+        .filter((deal: any) => deal.stage?.toLowerCase() === "closed-won")
         .reduce((sum: number, deal: any) => sum + (deal.value || 0), 0)
-      const tasksForUser = taskCountsByUserId.get(user._id || user.id) || { assigned: 0, completed: 0 }
+
       return {
         name: user.name,
         deals: userDeals.length,
         revenue: userRevenue,
-        tasksCompleted: tasksForUser.completed,
-        tasksAssigned: tasksForUser.assigned,
-        target: 150000,
+        target: 150000, // Default target, could be made configurable
       }
     })
-    .slice(0, 4)
+    .slice(0, 4) // Show top 4 team members
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -94,7 +90,7 @@ export default function Dashboard() {
   }
 
   const getStageColor = (stage: string) => {
-    const stageKey = normalizeStage(stage)
+    const stageKey = stage?.toLowerCase() || ""
     switch (stageKey) {
       case "lead":
         return "bg-blue-100 text-blue-800"
@@ -105,31 +101,12 @@ export default function Dashboard() {
       case "negotiation":
         return "bg-orange-100 text-orange-800"
       case "closed-won":
+      case "closed won":
         return "bg-emerald-100 text-emerald-800"
-      case "closed-lost":
-        return "bg-red-100 text-red-800"
       default:
         return "bg-gray-100 text-gray-800"
     }
   }
-
-  const recentDeals = deals
-    .sort(
-      (a: any, b: any) =>
-        new Date(b.updatedAt || b.createdAt || "").getTime() - new Date(a.updatedAt || a.createdAt || "").getTime(),
-    )
-    .slice(0, 3)
-    .map((deal: any) => ({
-      id: deal._id || deal.id,
-      name: deal.title || deal.name,
-      company: deal.client || deal.company,
-      value: deal.value || 0,
-      stage: deal.stage || "lead",
-      probability: deal.probability || 0,
-      contact: deal.assignedTo || deal.assignee || "Unassigned",
-      phone: "",
-      email: "",
-    }))
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -181,8 +158,7 @@ export default function Dashboard() {
           <CardContent>
             <div className="text-lg md:text-2xl font-bold">{conversionRate.toFixed(1)}%</div>
             <p className="text-xs text-muted-foreground">
-              <span className="text-green-600">{closedWonDeals.length} won</span> /
-              <span className="text-red-600"> {closedLostDeals.length} lost</span>
+              <span className="text-green-600">{closedWonDeals.length} won deals</span>
             </p>
           </CardContent>
         </Card>
@@ -206,17 +182,10 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle className="text-base md:text-lg">Revenue Overview</CardTitle>
             <CardDescription className="text-sm">Monthly revenue for the past 6 months</CardDescription>
-            <div className="text-xs md:text-sm text-muted-foreground">Total: ${totalRevenue.toLocaleString()}</div>
           </CardHeader>
           <CardContent className="p-2 md:p-6">
             <div className="h-[250px] md:h-[300px] w-full">
-              {activeDeals.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  No Deals in Pipeline
-                </div>
-              ) : (
-                <RevenueChart />
-              )}
+              <RevenueChart />
             </div>
           </CardContent>
         </Card>
@@ -375,9 +344,7 @@ export default function Dashboard() {
                       </Avatar>
                       <div>
                         <p className="font-medium text-sm md:text-base">{member.name}</p>
-                        <p className="text-xs md:text-sm text-muted-foreground">
-                          {member.deals} deals • {member.tasksCompleted}/{member.tasksAssigned} tasks completed
-                        </p>
+                        <p className="text-xs md:text-sm text-muted-foreground">{member.deals} deals</p>
                       </div>
                     </div>
                     <div className="text-right">

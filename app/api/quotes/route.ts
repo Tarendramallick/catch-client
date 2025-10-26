@@ -34,12 +34,6 @@ export async function POST(request: NextRequest) {
       status = "draft",
     } = body
 
-    const allowedStatuses = ["draft", "sent", "accepted", "declined", "withdrawn"]
-    const normalizedStatus = (status || "draft").toString().toLowerCase()
-    if (!allowedStatuses.includes(normalizedStatus)) {
-      return NextResponse.json({ success: false, error: "Invalid status" }, { status: 400 })
-    }
-
     if (!quoteNumber || !clientCompany || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
         { success: false, error: "quoteNumber, clientCompany and at least one item are required" },
@@ -56,7 +50,7 @@ export async function POST(request: NextRequest) {
       subtotal: Number.isFinite(+subtotal) ? +subtotal : 0,
       total: Number.isFinite(+total) ? +total : 0,
       attachedFiles,
-      status: normalizedStatus,
+      status,
       createdAt: now,
       updatedAt: now,
     }

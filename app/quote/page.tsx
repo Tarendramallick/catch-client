@@ -48,8 +48,6 @@ const fetcher = async (url: string) => {
   return data.data || data
 }
 
-const statusOptions = ["Draft", "Sent", "Accepted", "Declined", "Withdrawn"]
-
 export default function QuotePage() {
   const { toast } = useToast()
   // Quotes list
@@ -72,7 +70,16 @@ export default function QuotePage() {
     website: "",
   })
   const [attachedFiles, setAttachedFiles] = useState<File[]>([])
-  const [status, setStatus] = useState<string>("Draft")
+
+  // Suggestions for company typeahead
+  const allCompanyNames: string[] = useMemo(
+    () => Array.from(new Set(companies.map((c: any) => c.name).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [companies],
+  )
+  const filteredSuggestions = useMemo(() => {
+    if (!clientCompany.trim()) return []
+    return allCompanyNames.filter((n) => n.toLowerCase().includes(clientCompany.toLowerCase())).slice(0, 8)
+  }, [clientCompany, allCompanyNames])
 
   const resetForm = () => {
     setQuoteNumber(`QT-${Date.now().toString().slice(-6)}`)
@@ -81,7 +88,6 @@ export default function QuotePage() {
     setCompanyInfo({ name: "", address: "", phone: "", email: "", website: "" })
     setAttachedFiles([])
     setShowSuggestions(false)
-    setStatus("Draft")
   }
 
   const addItem = () => {
@@ -106,17 +112,6 @@ export default function QuotePage() {
   }
   const removeFile = (index: number) => setAttachedFiles((prev) => prev.filter((_, i) => i !== index))
 
-  const deleteQuote = async (id: string) => {
-    if (!confirm("Delete this quote?")) return
-    const res = await fetch(`/api/quotes/${id}`, { method: "DELETE" })
-    if (!res.ok) {
-      toast({ title: "Error", description: "Failed to delete quote", variant: "destructive" })
-      return
-    }
-    await mutateQuotes()
-    toast({ title: "Quote Deleted", description: "The quote has been removed." })
-  }
-
   const subtotal = items.reduce((sum, item) => sum + (item.total || 0), 0)
   const total = subtotal
 
@@ -130,7 +125,7 @@ export default function QuotePage() {
         subtotal,
         total,
         attachedFiles: attachedFiles.map((f) => f.name),
-        status: status.toLowerCase(),
+        status: "draft",
       }
       const res = await fetch("/api/quotes", {
         method: "POST",
@@ -150,15 +145,6 @@ export default function QuotePage() {
       })
     }
   }
-
-  const allCompanyNames = useMemo(
-    () => Array.from(new Set(companies.map((c: any) => c.name).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
-    [companies],
-  )
-  const filteredSuggestions = useMemo(() => {
-    if (!clientCompany.trim()) return []
-    return allCompanyNames.filter((n) => n.toLowerCase().includes(clientCompany.toLowerCase())).slice(0, 8)
-  }, [clientCompany, allCompanyNames])
 
   return (
     <div className="space-y-6">
@@ -189,7 +175,6 @@ export default function QuotePage() {
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Created</TableHead>
-                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -204,16 +189,11 @@ export default function QuotePage() {
                     </Badge>
                   </TableCell>
                   <TableCell>{q.createdAt ? new Date(q.createdAt).toLocaleDateString() : ""}</TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="sm" className="text-red-600" onClick={() => deleteQuote(q.id)}>
-                      <Trash2 className="h-4 w-4 mr-1" /> Delete
-                    </Button>
-                  </TableCell>
                 </TableRow>
               ))}
               {(quotes || []).length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
                     No quotes found
                   </TableCell>
                 </TableRow>
@@ -509,23 +489,6 @@ export default function QuotePage() {
                       Quote #{quoteNumber}
                     </Badge>
                     <p className="text-xs text-muted-foreground text-center">Valid for 30 days from creation</p>
-                  </div>
-
-                  {/* Status Selection */}
-                  <div className="space-y-2">
-                    <Label htmlFor="quoteStatus">Status</Label>
-                    <select
-                      id="quoteStatus"
-                      className="w-full border rounded px-3 py-2 bg-background"
-                      value={status}
-                      onChange={(e) => setStatus(e.target.value)}
-                    >
-                      {statusOptions.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
                   </div>
 
                   {/* Actions */}

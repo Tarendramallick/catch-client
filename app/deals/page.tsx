@@ -210,9 +210,7 @@ export default function DealsPage() {
       probability: Number.parseInt(newDeal.probability),
       expectedCloseDate:
         newDeal.expectedCloseDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-      assignedTo: assignee?.name || undefined,
-      assigneeId: newDeal.assignedTo || undefined,
-      closeDate: newDeal.expectedCloseDate || undefined,
+      assignedTo: assignee?.name || newDeal.assignedTo,
       avatar: assignee?.avatar || "/placeholder.svg?height=32&width=32",
     }
 
@@ -388,7 +386,7 @@ export default function DealsPage() {
       stage: deal.stage,
       probability: deal.probability.toString(),
       expectedCloseDate: deal.expectedCloseDate,
-      assignedTo: deal.assigneeId || deal.assignedTo, // Use assigneeId if available, fallback to assignedTo
+      assignedTo: deal.assignedTo,
     })
     setEditingDeal(deal._id || deal.id)
     setIsDialogOpen(true)
@@ -616,7 +614,7 @@ export default function DealsPage() {
                                   <Building2 className="h-3 w-3 text-muted-foreground" />
                                   <span className="text-xs text-muted-foreground">{deal.company}</span>
                                   <Badge variant="outline" className="text-xs">
-                                    {deal.industry || "Industry"}
+                                    {deal.industry || "N/A"}
                                   </Badge>
                                 </div>
                               </div>
@@ -739,7 +737,7 @@ export default function DealsPage() {
                                 <Building2 className="h-3 w-3 text-muted-foreground" />
                                 <span className="text-xs text-muted-foreground">{deal.company}</span>
                                 <Badge variant="outline" className="text-xs">
-                                  {deal.industry || "Industry"}
+                                  {deal.industry || "N/A"}
                                 </Badge>
                               </div>
                             </div>
@@ -947,7 +945,7 @@ export default function DealsPage() {
                         <Building2 className="h-3 w-3 text-muted-foreground" />
                         <span className="text-xs text-muted-foreground">{deal.company}</span>
                         <Badge variant="outline" className="text-xs">
-                          {deal.industry || "Industry"}
+                          {deal.industry || "N/A"}
                         </Badge>
                       </div>
                     </div>
@@ -1010,7 +1008,7 @@ export default function DealsPage() {
                         <Building2 className="h-3 w-3 text-muted-foreground" />
                         <span className="text-xs text-muted-foreground">{deal.company}</span>
                         <Badge variant="outline" className="text-xs">
-                          {deal.industry || "Industry"}
+                          {deal.industry || "N/A"}
                         </Badge>
                       </div>
                     </div>

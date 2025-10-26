@@ -50,19 +50,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const {
-      title,
-      company,
-      contactId,
-      value,
-      stage,
-      probability,
-      closeDate,
-      expectedCloseDate, // new accepted field from UI
-      assigneeId,
-      assignedTo, // accepted optional display name
-      description,
-    } = body
+    const { title, company, contactId, value, stage, probability, closeDate, assigneeId, description } = body
 
     if (!title || !company || value === undefined) {
       return NextResponse.json({ success: false, error: "Title, company, and value are required" }, { status: 400 })
@@ -71,17 +59,15 @@ export async function POST(request: NextRequest) {
     const dealsCol = await getDealsCollection()
     const now = new Date()
 
-    const doc: any = {
+    const doc = {
       title,
       company,
       contactId: contactId && ObjectId.isValid(contactId) ? new ObjectId(contactId) : contactId || null,
       value: Number.isFinite(+value) ? +value : 0,
       stage: stage || "Lead",
       probability: Number.isFinite(+probability) ? +probability : 25,
-      expectedCloseDate: expectedCloseDate ? new Date(expectedCloseDate) : undefined,
-      closeDate: closeDate ? new Date(closeDate) : expectedCloseDate ? new Date(expectedCloseDate) : undefined,
+      closeDate: closeDate ? new Date(closeDate) : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
       assigneeId: assigneeId && ObjectId.isValid(assigneeId) ? new ObjectId(assigneeId) : assigneeId || null,
-      assignedTo: assignedTo || null,
       description: description || "",
       createdDate: now,
       updatedDate: now,
@@ -89,7 +75,7 @@ export async function POST(request: NextRequest) {
       source: "app",
     }
 
-    const res = await dealsCol.insertOne(doc)
+    const res = await dealsCol.insertOne(doc as any)
     const created = { id: res.insertedId.toString(), _id: res.insertedId, ...doc }
 
     return NextResponse.json({ success: true, data: created, message: "Deal created successfully" }, { status: 201 })
