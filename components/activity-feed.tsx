@@ -1,4 +1,6 @@
 "use client"
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Phone, Mail, Users, CheckSquare, FileText, Target, User, Clock } from "lucide-react"
@@ -20,7 +22,6 @@ type ActivityType =
   | "note"
   | "deal_update"
   | "contact_update"
-  | "contact_created"
   | "company"
   | "custom"
 
@@ -39,7 +40,6 @@ const getActivityIcon = (type: ActivityType) => {
     case "deal_update":
       return <Target className="h-4 w-4 text-red-500" />
     case "contact_update":
-    case "contact_created":
       return <User className="h-4 w-4 text-indigo-500" />
     default:
       return <Clock className="h-4 w-4 text-gray-500" />
@@ -61,7 +61,6 @@ const getActivityColor = (type: ActivityType) => {
     case "deal_update":
       return "bg-red-100 text-red-800"
     case "contact_update":
-    case "contact_created":
       return "bg-indigo-100 text-indigo-800"
     default:
       return "bg-gray-100 text-gray-800"
@@ -73,36 +72,70 @@ export function ActivityFeed() {
 
   if (isLoading) {
     return (
-      <div className="space-y-3">
-        <div className="h-4 w-40 bg-muted rounded animate-pulse" />
-        <div className="h-3 w-72 bg-muted rounded animate-pulse" />
-        <div className="h-4 w-56 bg-muted rounded animate-pulse" />
-        <div className="h-3 w-64 bg-muted rounded animate-pulse" />
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Recent Activity
+          </CardTitle>
+          <CardDescription>Latest updates across all contacts, deals, and tasks</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="h-4 w-40 bg-muted rounded animate-pulse" />
+          <div className="h-3 w-72 bg-muted rounded animate-pulse" />
+          <div className="h-4 w-56 bg-muted rounded animate-pulse" />
+          <div className="h-3 w-64 bg-muted rounded animate-pulse" />
+        </CardContent>
+      </Card>
     )
   }
 
   if (error) {
-    return <div className="text-center text-red-600 py-6">Failed to load activity</div>
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Recent Activity
+          </CardTitle>
+          <CardDescription>Latest updates across all contacts, deals, and tasks</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center text-red-600 py-6">Failed to load activity</div>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
-    <div className="space-y-4">
-      {activities.length === 0 ? (
-        <div className="text-center text-muted-foreground py-8">No recent activity to display</div>
-      ) : (
-        activities.map((activity: any, index: number) => (
-          <div key={activity.id || index}>
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-start gap-3 flex-1">
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Clock className="h-5 w-5" />
+          Recent Activity
+        </CardTitle>
+        <CardDescription>Latest updates across all contacts, deals, and tasks</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {activities.length === 0 ? (
+          <div className="text-center text-muted-foreground py-8">No recent activity to display</div>
+        ) : (
+          activities.map((activity: any, index: number) => (
+            <div key={activity.id || index}>
+              <div className="flex items-start space-x-3">
                 <div className="flex-shrink-0 mt-1">{getActivityIcon(activity.type)}</div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">{activity.title}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">{activity.title}</p>
+                    <Badge className={getActivityColor(activity.type)} variant="secondary">
+                      {(activity.type || "").replace("_", " ")}
+                    </Badge>
+                  </div>
                   {activity.description && <p className="text-sm text-muted-foreground mt-1">{activity.description}</p>}
-                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
+                  <div className="flex items-center space-x-4 mt-2 text-xs text-muted-foreground">
+                    <span className="flex items-center space-x-1">
                       <User className="h-3 w-3" />
-                      <span>{activity.userName || "System"}</span>
+                      <span>{activity.userName || "User"}</span>
                     </span>
                     {activity.entityType && activity.entityName && (
                       <span>
@@ -115,14 +148,11 @@ export function ActivityFeed() {
                   </div>
                 </div>
               </div>
-              <Badge className={`${getActivityColor(activity.type)} text-xs shrink-0`} variant="secondary">
-                {(activity.type || "").replace("_", " ")}
-              </Badge>
+              {index < activities.length - 1 && <Separator className="mt-4" />}
             </div>
-            {index < activities.length - 1 && <Separator className="mt-4" />}
-          </div>
-        ))
-      )}
-    </div>
+          ))
+        )}
+      </CardContent>
+    </Card>
   )
 }

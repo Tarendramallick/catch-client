@@ -126,8 +126,7 @@ export default function Dashboard() {
       value: deal.value || 0,
       stage: deal.stage || "lead",
       probability: deal.probability || 0,
-      contact:
-        deal.assignedTo || deal.assignee || users.find((u: any) => u._id === deal.assigneeId)?.name || "Unassigned",
+      contact: deal.assignedTo || deal.assignee || "Unassigned",
       phone: "",
       email: "",
     }))
