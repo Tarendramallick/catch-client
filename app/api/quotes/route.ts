@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getQuotesCollection } from "@/lib/database/collections"
+import { getQuotesCollection, getActivitiesCollection } from "@/lib/database/collections"
 
 export const dynamic = "force-dynamic"
 
@@ -34,6 +34,12 @@ export async function POST(request: NextRequest) {
       status = "draft",
     } = body
 
+    const allowedStatuses = ["draft", "sent", "accepted", "declined", "withdrawn"]
+    const normalizedStatus = (status || "draft").toString().toLowerCase()
+    if (!allowedStatuses.includes(normalizedStatus)) {
+      return NextResponse.json({ success: false, error: "Invalid status" }, { status: 400 })
+    }
+
     if (!quoteNumber || !clientCompany || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
         { success: false, error: "quoteNumber, clientCompany and at least one item are required" },
@@ -50,7 +56,7 @@ export async function POST(request: NextRequest) {
       subtotal: Number.isFinite(+subtotal) ? +subtotal : 0,
       total: Number.isFinite(+total) ? +total : 0,
       attachedFiles,
-      status,
+      status: normalizedStatus,
       createdAt: now,
       updatedAt: now,
     }
@@ -58,6 +64,27 @@ export async function POST(request: NextRequest) {
     const col = await getQuotesCollection()
     const res = await col.insertOne(doc as any)
     const created = { id: res.insertedId.toString(), _id: res.insertedId, ...doc }
+
+    try {
+      const activitiesCol = await getActivitiesCollection()
+      await activitiesCol.insertOne({
+        type: "custom",
+        title: "New quote created",
+        description: `Quote #${quoteNumber} for ${clientCompany} - $${total.toLocaleString()}`,
+        timestamp: now,
+        userId: "1",
+        userName: "System",
+        userAvatar: "/placeholder.svg?height=40&width=40",
+        entityType: "system",
+        entityId: res.insertedId,
+        entityName: `Quote #${quoteNumber}`,
+        metadata: { clientCompany, total, status: normalizedStatus },
+        isPublic: true,
+      } as any)
+    } catch (activityError) {
+      console.error("[quotes.POST] Failed to log activity:", activityError)
+    }
+
     return NextResponse.json({ success: true, data: created, message: "Quote created successfully" }, { status: 201 })
   } catch (error) {
     console.error("[quotes.POST] error:", error)

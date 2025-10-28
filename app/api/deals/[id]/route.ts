@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { ObjectId } from "mongodb"
-import { getDealsCollection } from "@/lib/database/collections"
+import { getDealsCollection, getActivitiesCollection } from "@/lib/database/collections"
 
 export const dynamic = "force-dynamic"
 
@@ -60,9 +60,34 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
 
     const col = await getDealsCollection()
+    const oldDoc = await col.findOne({ _id: oid })
     const result = await col.findOneAndUpdate({ _id: oid }, { $set }, { returnDocument: "after" })
     const updated = result.value
     if (!updated) return NextResponse.json({ success: false, error: "Deal not found" }, { status: 404 })
+
+    if (oldDoc && "stage" in body && oldDoc.stage !== $set.stage) {
+      try {
+        const activitiesCol = await getActivitiesCollection()
+        await activitiesCol.insertOne({
+          type: "deal_stage_changed",
+          title: "Deal stage updated",
+          description: `${updated.title} moved from ${oldDoc.stage} to ${$set.stage}`,
+          timestamp: new Date(),
+          userId: updated.assigneeId || "1",
+          userName: updated.assignedTo || "System",
+          userAvatar: "/placeholder.svg?height=40&width=40",
+          entityType: "deal",
+          entityId: oid,
+          entityName: updated.title,
+          previousValue: oldDoc.stage,
+          newValue: $set.stage,
+          metadata: { company: updated.company, value: updated.value },
+          isPublic: true,
+        } as any)
+      } catch (activityError) {
+        console.error("[deals.PUT] Failed to log activity:", activityError)
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -111,9 +136,34 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     }
 
     const col = await getDealsCollection()
+    const oldDoc = await col.findOne({ _id: oid })
     const result = await col.findOneAndUpdate({ _id: oid }, { $set }, { returnDocument: "after" })
     const updated = result.value
     if (!updated) return NextResponse.json({ success: false, error: "Deal not found" }, { status: 404 })
+
+    if (oldDoc && "stage" in body && oldDoc.stage !== $set.stage) {
+      try {
+        const activitiesCol = await getActivitiesCollection()
+        await activitiesCol.insertOne({
+          type: "deal_stage_changed",
+          title: "Deal stage updated",
+          description: `${updated.title} moved from ${oldDoc.stage} to ${$set.stage}`,
+          timestamp: new Date(),
+          userId: updated.assigneeId || "1",
+          userName: updated.assignedTo || "System",
+          userAvatar: "/placeholder.svg?height=40&width=40",
+          entityType: "deal",
+          entityId: oid,
+          entityName: updated.title,
+          previousValue: oldDoc.stage,
+          newValue: $set.stage,
+          metadata: { company: updated.company, value: updated.value },
+          isPublic: true,
+        } as any)
+      } catch (activityError) {
+        console.error("[deals.PATCH] Failed to log activity:", activityError)
+      }
+    }
 
     return NextResponse.json({
       success: true,

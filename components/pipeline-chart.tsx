@@ -11,7 +11,19 @@ const fetcher = async (url: string) => {
 }
 
 export function PipelineChart() {
-  const { data: deals = [] } = useSWR("/api/deals", fetcher)
+  const { data: deals = [], isLoading, error } = useSWR("/api/deals", fetcher)
+
+  if (isLoading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" aria-label="Loading pipeline" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return <div className="text-center text-red-600 py-8">Failed to load pipeline</div>
+  }
 
   const data = (() => {
     const stages = [
@@ -19,26 +31,25 @@ export function PipelineChart() {
       { id: "qualified", name: "Qualified", color: "#82ca9d" },
       { id: "proposal", name: "Proposal", color: "#ffc658" },
       { id: "negotiation", name: "Negotiation", color: "#ff7300" },
-      // removed Closed Won from pipeline pie per request
+      // Closed stages intentionally excluded from pipeline
     ]
 
     return stages
       .map((stage) => {
         const stageDeals = deals.filter((deal: any) => {
-          const dealStage = (deal.stage || "").toLowerCase().replace(" ", "-")
-          return dealStage === stage.id
+          const s = (deal.stage || "").toLowerCase().replace(" ", "-")
+          return s === stage.id
         })
-
         const dealCount = stageDeals.length
-        return {
-          name: stage.name,
-          value: dealCount, // count of deals
-          dealCount,
-          color: stage.color,
-        }
+        return { name: stage.name, value: dealCount, dealCount, color: stage.color }
       })
       .filter((stage) => stage.dealCount > 0)
   })()
+
+  const totalDealsInPipeline = data.reduce((sum, s) => sum + s.dealCount, 0)
+  if (totalDealsInPipeline === 0) {
+    return <div className="text-center text-muted-foreground py-8">No Deals in Pipeline</div>
+  }
 
   const fallbackData = [
     { name: "Lead", value: 2, dealCount: 2, color: "#8884d8" },

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { ObjectId } from "mongodb"
-import { getTasksCollection } from "@/lib/database/collections"
+import { getTasksCollection, getActivitiesCollection } from "@/lib/database/collections"
 
 export const dynamic = "force-dynamic"
 
@@ -50,9 +50,32 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     $set.updatedDate = new Date()
 
     const col = await getTasksCollection()
+    const oldDoc = await col.findOne({ _id: oid })
     const result = await col.findOneAndUpdate({ _id: oid }, { $set }, { returnDocument: "after" })
     const updated = result.value
     if (!updated) return NextResponse.json({ success: false, error: "Task not found" }, { status: 404 })
+
+    if (oldDoc && oldDoc.status !== "completed" && $set.status === "completed") {
+      try {
+        const activitiesCol = await getActivitiesCollection()
+        await activitiesCol.insertOne({
+          type: "task_completed",
+          title: "Task completed",
+          description: `${updated.title} marked as complete`,
+          timestamp: new Date(),
+          userId: updated.assigneeId || "1",
+          userName: "System",
+          userAvatar: "/placeholder.svg?height=40&width=40",
+          entityType: "task",
+          entityId: oid,
+          entityName: updated.title,
+          metadata: { priority: updated.priority, type: updated.type },
+          isPublic: true,
+        } as any)
+      } catch (activityError) {
+        console.error("[tasks.PUT] Failed to log activity:", activityError)
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -89,9 +112,32 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     $set.updatedDate = new Date()
 
     const col = await getTasksCollection()
+    const oldDoc = await col.findOne({ _id: oid })
     const result = await col.findOneAndUpdate({ _id: oid }, { $set }, { returnDocument: "after" })
     const updated = result.value
     if (!updated) return NextResponse.json({ success: false, error: "Task not found" }, { status: 404 })
+
+    if (oldDoc && oldDoc.status !== "completed" && $set.status === "completed") {
+      try {
+        const activitiesCol = await getActivitiesCollection()
+        await activitiesCol.insertOne({
+          type: "task_completed",
+          title: "Task completed",
+          description: `${updated.title} marked as complete`,
+          timestamp: new Date(),
+          userId: updated.assigneeId || "1",
+          userName: "System",
+          userAvatar: "/placeholder.svg?height=40&width=40",
+          entityType: "task",
+          entityId: oid,
+          entityName: updated.title,
+          metadata: { priority: updated.priority, type: updated.type },
+          isPublic: true,
+        } as any)
+      } catch (activityError) {
+        console.error("[tasks.PATCH] Failed to log activity:", activityError)
+      }
+    }
 
     return NextResponse.json({
       success: true,

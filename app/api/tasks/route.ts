@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { ObjectId } from "mongodb"
-import { getTasksCollection } from "@/lib/database/collections"
+import { getTasksCollection, getActivitiesCollection } from "@/lib/database/collections"
 
 export const dynamic = "force-dynamic"
 
@@ -78,6 +78,26 @@ export async function POST(request: NextRequest) {
 
     const res = await tasksCol.insertOne(doc as any)
     const created = { id: res.insertedId.toString(), _id: res.insertedId, ...doc }
+
+    try {
+      const activitiesCol = await getActivitiesCollection()
+      await activitiesCol.insertOne({
+        type: "task_created",
+        title: "New task created",
+        description: `${title} - ${priority} priority`,
+        timestamp: now,
+        userId: ObjectId.isValid(assigneeId) ? new ObjectId(assigneeId) : assigneeId,
+        userName: "System",
+        userAvatar: "/placeholder.svg?height=40&width=40",
+        entityType: "task",
+        entityId: res.insertedId,
+        entityName: title,
+        metadata: { type, priority, dueDate },
+        isPublic: true,
+      } as any)
+    } catch (activityError) {
+      console.error("[tasks.POST] Failed to log activity:", activityError)
+    }
 
     return NextResponse.json({ success: true, data: created, message: "Task created successfully" }, { status: 201 })
   } catch (error) {

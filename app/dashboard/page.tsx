@@ -24,10 +24,14 @@ export default function Dashboard() {
   const { data: users = [] } = useSWR("/api/users", fetcher)
   const { data: companies = [] } = useSWR("/api/companies", fetcher)
 
-  const activeDeals = deals.filter((deal: any) => !["closed-won", "closed-lost"].includes(deal.stage?.toLowerCase()))
-  const closedWonDeals = deals.filter((deal: any) => deal.stage?.toLowerCase() === "closed-won")
+  const activeDeals = deals.filter((deal: any) => !["Closed Won", "Closed Lost"].includes(deal.stage))
+  const closedWonDeals = deals.filter((deal: any) => deal.stage === "Closed Won")
+  const closedLostDeals = deals.filter((deal: any) => deal.stage === "Closed Lost")
+
   const totalRevenue = closedWonDeals.reduce((sum: number, deal: any) => sum + (deal.value || 0), 0)
-  const conversionRate = deals.length > 0 ? (closedWonDeals.length / deals.length) * 100 : 0
+
+  const totalClosedDeals = closedWonDeals.length + closedLostDeals.length
+  const conversionRate = totalClosedDeals > 0 ? (closedWonDeals.length / totalClosedDeals) * 100 : 0
 
   const recentDeals = deals
     .sort(
@@ -35,17 +39,20 @@ export default function Dashboard() {
         new Date(b.updatedAt || b.createdAt || "").getTime() - new Date(a.updatedAt || a.createdAt || "").getTime(),
     )
     .slice(0, 3)
-    .map((deal: any) => ({
-      id: deal._id || deal.id,
-      name: deal.title || deal.name,
-      company: deal.client || deal.company,
-      value: deal.value || 0,
-      stage: deal.stage || "lead",
-      probability: deal.probability || 0,
-      contact: deal.assignee || "Unassigned",
-      phone: "",
-      email: "",
-    }))
+    .map((deal: any) => {
+      const assignedUser = users.find((u: any) => (u._id || u.id) === deal.assigneeId)
+      return {
+        id: deal._id || deal.id,
+        name: deal.title || deal.name,
+        company: deal.client || deal.company,
+        value: deal.value || 0,
+        stage: deal.stage || "lead",
+        probability: deal.probability || 0,
+        contact: assignedUser?.name || deal.assignedTo || "Unassigned",
+        phone: "",
+        email: "",
+      }
+    })
 
   const upcomingTasks = tasks
     .filter((task: any) => !task.completed && task.status !== "completed")
@@ -60,21 +67,34 @@ export default function Dashboard() {
       company: task.client || "Unknown",
     }))
 
+  const taskCountsByUserId = new Map<string, { assigned: number; completed: number }>()
+  ;(tasks || []).forEach((t: any) => {
+    const userId = t.assigneeId || t.assignee || ""
+    const entry = taskCountsByUserId.get(userId) || { assigned: 0, completed: 0 }
+    entry.assigned += 1
+    if (t.completed || t.status === "completed") entry.completed += 1
+    taskCountsByUserId.set(userId, entry)
+  })
+
   const teamPerformance = users
     .map((user: any) => {
-      const userDeals = deals.filter((deal: any) => deal.assigneeId === user._id || deal.assignee === user.name)
+      const userDeals = deals.filter(
+        (deal: any) => deal.assigneeId === (user._id || user.id) || deal.assignee === user.name,
+      )
       const userRevenue = userDeals
-        .filter((deal: any) => deal.stage?.toLowerCase() === "closed-won")
+        .filter((deal: any) => deal.stage === "Closed Won")
         .reduce((sum: number, deal: any) => sum + (deal.value || 0), 0)
-
+      const tasksForUser = taskCountsByUserId.get(user._id || user.id) || { assigned: 0, completed: 0 }
       return {
         name: user.name,
         deals: userDeals.length,
         revenue: userRevenue,
-        target: 150000, // Default target, could be made configurable
+        tasksCompleted: tasksForUser.completed,
+        tasksAssigned: tasksForUser.assigned,
+        target: 150000,
       }
     })
-    .slice(0, 4) // Show top 4 team members
+    .slice(0, 4)
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -158,7 +178,8 @@ export default function Dashboard() {
           <CardContent>
             <div className="text-lg md:text-2xl font-bold">{conversionRate.toFixed(1)}%</div>
             <p className="text-xs text-muted-foreground">
-              <span className="text-green-600">{closedWonDeals.length} won deals</span>
+              <span className="text-green-600">{closedWonDeals.length} won</span> vs{" "}
+              <span className="text-red-600">{closedLostDeals.length} lost</span>
             </p>
           </CardContent>
         </Card>
@@ -185,7 +206,13 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="p-2 md:p-6">
             <div className="h-[250px] md:h-[300px] w-full">
-              <RevenueChart />
+              {activeDeals.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  No Deals in Pipeline
+                </div>
+              ) : (
+                <RevenueChart />
+              )}
             </div>
           </CardContent>
         </Card>
@@ -344,7 +371,9 @@ export default function Dashboard() {
                       </Avatar>
                       <div>
                         <p className="font-medium text-sm md:text-base">{member.name}</p>
-                        <p className="text-xs md:text-sm text-muted-foreground">{member.deals} deals</p>
+                        <p className="text-xs md:text-sm text-muted-foreground">
+                          {member.deals} deals • {member.tasksCompleted}/{member.tasksAssigned} tasks completed
+                        </p>
                       </div>
                     </div>
                     <div className="text-right">

@@ -11,7 +11,7 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "CatchClients - Smart CRM for Modern Teams",
   description: "Modern CRM platform to manage client relationships, track leads, and streamline sales operations",
-    generator: 'www.tarendra-mallick.vercel.app'
+    generator: 'v0.app'
 }
 
 export default function RootLayout({

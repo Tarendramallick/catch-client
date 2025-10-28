@@ -28,7 +28,7 @@ export function RevenueChart() {
 
     return last6Months.map(({ monthIndex, year, name }) => {
       const closedWonDeals = deals.filter((deal: any) => {
-        if (deal.stage?.toLowerCase() !== "closed-won") return false
+        if (deal.stage !== "Closed Won") return false
 
         const dealDate = new Date(deal.updatedAt || deal.createdAt || "")
         return dealDate.getMonth() === monthIndex && dealDate.getFullYear() === year

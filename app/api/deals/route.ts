@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { ObjectId } from "mongodb"
-import { getDealsCollection } from "@/lib/database/collections"
+import { getDealsCollection, getActivitiesCollection } from "@/lib/database/collections"
 
 export const dynamic = "force-dynamic"
 
@@ -50,7 +50,21 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { title, company, contactId, value, stage, probability, closeDate, assigneeId, description } = body
+    const {
+      title,
+      company,
+      industry,
+      contactId,
+      value,
+      stage,
+      probability,
+      closeDate,
+      expectedCloseDate,
+      assigneeId,
+      assignedTo,
+      avatar,
+      description,
+    } = body
 
     if (!title || !company || value === undefined) {
       return NextResponse.json({ success: false, error: "Title, company, and value are required" }, { status: 400 })
@@ -62,12 +76,22 @@ export async function POST(request: NextRequest) {
     const doc = {
       title,
       company,
+      industry: industry || "N/A",
       contactId: contactId && ObjectId.isValid(contactId) ? new ObjectId(contactId) : contactId || null,
       value: Number.isFinite(+value) ? +value : 0,
       stage: stage || "Lead",
       probability: Number.isFinite(+probability) ? +probability : 25,
-      closeDate: closeDate ? new Date(closeDate) : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+      closeDate: closeDate
+        ? new Date(closeDate)
+        : expectedCloseDate
+          ? new Date(expectedCloseDate)
+          : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+      expectedCloseDate: expectedCloseDate
+        ? new Date(expectedCloseDate)
+        : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
       assigneeId: assigneeId && ObjectId.isValid(assigneeId) ? new ObjectId(assigneeId) : assigneeId || null,
+      assignedTo: assignedTo || "Unassigned",
+      avatar: avatar || "/placeholder.svg?height=32&width=32",
       description: description || "",
       createdDate: now,
       updatedDate: now,
@@ -77,6 +101,26 @@ export async function POST(request: NextRequest) {
 
     const res = await dealsCol.insertOne(doc as any)
     const created = { id: res.insertedId.toString(), _id: res.insertedId, ...doc }
+
+    try {
+      const activitiesCol = await getActivitiesCollection()
+      await activitiesCol.insertOne({
+        type: "deal_created",
+        title: "New deal created",
+        description: `${title} created for ${company} - $${value.toLocaleString()}`,
+        timestamp: now,
+        userId: assigneeId && ObjectId.isValid(assigneeId) ? new ObjectId(assigneeId) : "1",
+        userName: assignedTo || "System",
+        userAvatar: avatar || "/placeholder.svg?height=40&width=40",
+        entityType: "deal",
+        entityId: res.insertedId,
+        entityName: title,
+        metadata: { company, value, stage },
+        isPublic: true,
+      } as any)
+    } catch (activityError) {
+      console.error("[deals.POST] Failed to log activity:", activityError)
+    }
 
     return NextResponse.json({ success: true, data: created, message: "Deal created successfully" }, { status: 201 })
   } catch (error) {

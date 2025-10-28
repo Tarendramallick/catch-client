@@ -24,6 +24,8 @@ export const COLLECTIONS = {
   NOTES: "notes",
   ACTIVITIES: "activities",
   QUOTES: "quotes",
+  WORKSPACES: "workspaces",
+  WORKSPACE_MESSAGES: "workspace_messages",
 } as const
 
 // Helper functions to get typed collections
@@ -100,4 +102,14 @@ export async function getActivitiesCollection() {
 export async function getQuotesCollection() {
   const db = await getDatabase()
   return db.collection<any>(COLLECTIONS.QUOTES)
+}
+
+export async function getWorkspacesCollection() {
+  const db = await getDatabase()
+  return db.collection<any>(COLLECTIONS.WORKSPACES)
+}
+
+export async function getWorkspaceMessagesCollection() {
+  const db = await getDatabase()
+  return db.collection<any>(COLLECTIONS.WORKSPACE_MESSAGES)
 }

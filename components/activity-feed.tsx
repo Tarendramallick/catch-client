@@ -67,7 +67,44 @@ const getActivityColor = (type: ActivityType) => {
 }
 
 export function ActivityFeed() {
-  const { data: activities = [] } = useSWR("/api/activities?limit=10", fetcher)
+  const { data: activities = [], error, isLoading } = useSWR("/api/activities?limit=10", fetcher)
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Recent Activity
+          </CardTitle>
+          <CardDescription>Latest updates across all contacts, deals, and tasks</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="h-4 w-40 bg-muted rounded animate-pulse" />
+          <div className="h-3 w-72 bg-muted rounded animate-pulse" />
+          <div className="h-4 w-56 bg-muted rounded animate-pulse" />
+          <div className="h-3 w-64 bg-muted rounded animate-pulse" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Recent Activity
+          </CardTitle>
+          <CardDescription>Latest updates across all contacts, deals, and tasks</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center text-red-600 py-6">Failed to load activity</div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card>

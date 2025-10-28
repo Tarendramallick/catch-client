@@ -198,19 +198,22 @@ export default function DealsPage() {
       return
     }
 
-    const assignee = users.find((user: any) => user._id === newDeal.assignedTo || user.id === newDeal.assignedTo)
+    const assignee = users.find((user: any) => (user._id || user.id) === newDeal.assignedTo)
 
     const dealData = {
       title: newDeal.title,
       company: newDeal.company,
-      industry: newDeal.industry,
+      industry: newDeal.industry || "N/A",
       description: newDeal.description,
       value: Number.parseInt(newDeal.value),
       stage: newDeal.stage,
       probability: Number.parseInt(newDeal.probability),
       expectedCloseDate:
         newDeal.expectedCloseDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-      assignedTo: assignee?.name || newDeal.assignedTo,
+      closeDate:
+        newDeal.expectedCloseDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+      assigneeId: newDeal.assignedTo,
+      assignedTo: assignee?.name || "Unassigned",
       avatar: assignee?.avatar || "/placeholder.svg?height=32&width=32",
     }
 
@@ -236,7 +239,7 @@ export default function DealsPage() {
       }
 
       console.log("Deal saved successfully")
-      mutate() // Refresh data
+      mutate()
       setIsDialogOpen(false)
       resetForm()
     } catch (error) {
@@ -258,7 +261,7 @@ export default function DealsPage() {
         }
 
         console.log("Deal deleted successfully")
-        mutate() // Refresh data
+        mutate()
       } catch (error) {
         console.error("Error deleting deal:", error)
         alert("Failed to delete deal")
@@ -284,7 +287,7 @@ export default function DealsPage() {
         }
 
         console.log("Deal marked as Closed Won")
-        mutate() // Refresh data
+        mutate()
       } catch (error) {
         console.error("Error updating deal:", error)
         alert("Failed to update deal")
@@ -310,7 +313,7 @@ export default function DealsPage() {
         }
 
         console.log("Deal marked as Closed Lost")
-        mutate() // Refresh data
+        mutate()
       } catch (error) {
         console.error("Error updating deal:", error)
         alert("Failed to update deal")
@@ -353,7 +356,7 @@ export default function DealsPage() {
         }
 
         console.log("Deal stage updated successfully")
-        mutate() // Refresh data
+        mutate()
       } catch (error) {
         console.error("Error updating deal stage:", error)
       }
@@ -380,13 +383,13 @@ export default function DealsPage() {
     setNewDeal({
       title: deal.title,
       company: deal.company,
-      industry: deal.industry || "",
+      industry: deal.industry || "N/A",
       description: deal.description,
       value: deal.value.toString(),
       stage: deal.stage,
       probability: deal.probability.toString(),
       expectedCloseDate: deal.expectedCloseDate,
-      assignedTo: deal.assignedTo,
+      assignedTo: deal.assigneeId || deal.assignedTo,
     })
     setEditingDeal(deal._id || deal.id)
     setIsDialogOpen(true)
