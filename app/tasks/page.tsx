@@ -528,12 +528,12 @@ export default function TasksPage() {
             </div>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 max-h-96 overflow-y-auto">
+            <div className="space-y-3 max-h-96 overflow-y-auto">
               {taskColumns.completed.map((task: any) => (
                 <TaskCard key={task.id} task={task} />
               ))}
               {taskColumns.completed.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4 col-span-full">No completed tasks yet</p>
+                <p className="text-sm text-muted-foreground text-center py-4">No completed tasks yet</p>
               )}
             </div>
           </CardContent>
