@@ -29,11 +29,26 @@ export default function Dashboard() {
   const { data: companies = [] } = useSWR("/api/companies", fetcher, { revalidateOnFocus: true })
 
   const activeDeals = deals.filter(
-    (deal: any) => deal && !["closed-won", "closed-lost"].includes((deal.stage || "").toLowerCase()),
+    (deal: any) =>
+      deal &&
+      !["closed-won", "closed won", "closed-lost", "closed lost"].includes((deal.stage || "").toLowerCase().trim()),
   )
-  const closedWonDeals = deals.filter((deal: any) => deal && (deal.stage || "").toLowerCase() === "closed-won")
-  const closedLostDeals = deals.filter((deal: any) => deal && (deal.stage || "").toLowerCase() === "closed-lost")
-  const totalRevenue = closedWonDeals.reduce((sum: number, deal: any) => sum + (deal.value || 0), 0)
+  const closedWonDeals = deals.filter((deal: any) => {
+    if (!deal) return false
+    const stage = (deal.stage || "").toLowerCase().trim()
+    return stage === "closed-won" || stage === "closed won"
+  })
+  const closedLostDeals = deals.filter((deal: any) => {
+    if (!deal) return false
+    const stage = (deal.stage || "").toLowerCase().trim()
+    return stage === "closed-lost" || stage === "closed lost"
+  })
+
+  const totalRevenue = closedWonDeals.reduce((sum: number, deal: any) => {
+    const value = deal.value || deal.dealValue || 0
+    return sum + (Number.isFinite(value) ? Number(value) : 0)
+  }, 0)
+
   const conversionRate = deals.length > 0 ? (closedWonDeals.length / deals.length) * 100 : 0
 
   const userMap = new Map(users.map((user: any) => [user._id || user.id, user]))
@@ -87,8 +102,15 @@ export default function Dashboard() {
         (deal: any) => deal && (deal.assigneeId === user._id || deal.assignee === user.name),
       )
       const userRevenue = userDeals
-        .filter((deal: any) => deal && (deal.stage || "").toLowerCase() === "closed-won")
-        .reduce((sum: number, deal: any) => sum + (deal.value || 0), 0)
+        .filter((deal: any) => {
+          if (!deal) return false
+          const stage = (deal.stage || "").toLowerCase().trim()
+          return stage === "closed-won" || stage === "closed won"
+        })
+        .reduce((sum: number, deal: any) => {
+          const value = deal.value || deal.dealValue || 0
+          return sum + (Number.isFinite(value) ? Number(value) : 0)
+        }, 0)
       const tasksForUser = taskCountsByUserId.get(user._id || user.id) || { assigned: 0, completed: 0 }
       const tasksNeeded = Math.max(0, tasksForUser.assigned - tasksForUser.completed)
       return {

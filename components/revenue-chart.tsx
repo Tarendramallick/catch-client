@@ -28,13 +28,18 @@ export function RevenueChart() {
 
     return last6Months.map(({ monthIndex, year, name }) => {
       const closedWonDeals = deals.filter((deal: any) => {
-        if (deal.stage?.toLowerCase() !== "closed-won") return false
+        if (!deal) return false
+        const stage = (deal.stage || "").toLowerCase().trim()
+        if (stage !== "closed-won" && stage !== "closed won") return false
 
-        const dealDate = new Date(deal.updatedAt || deal.createdAt || "")
+        const dealDate = new Date(deal.updatedAt || deal.updatedDate || deal.createdAt || deal.createdDate || "")
         return dealDate.getMonth() === monthIndex && dealDate.getFullYear() === year
       })
 
-      const actualRevenue = closedWonDeals.reduce((sum: number, deal: any) => sum + (deal.value || 0), 0)
+      const actualRevenue = closedWonDeals.reduce((sum: number, deal: any) => {
+        const value = deal.value || deal.dealValue || 0
+        return sum + (Number.isFinite(value) ? Number(value) : 0)
+      }, 0)
 
       return {
         month: name,
