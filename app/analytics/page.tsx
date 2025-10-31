@@ -46,11 +46,23 @@ export default function AnalyticsPage() {
 
   // Generate monthly revenue from closed deals
   const monthlyRevenue = (() => {
-    const months = ["Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    return months.map((month, index) => {
+    const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    const now = new Date()
+    const months = []
+
+    // Generate last 6 months
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const monthIndex = date.getMonth()
+      const year = date.getFullYear()
+      months.push({ month: monthLabels[monthIndex], monthIndex, year, date })
+    }
+
+    // Calculate revenue for each month
+    return months.map(({ month, monthIndex, year }) => {
       const monthDeals = closedWonDeals.filter((deal: any) => {
         const dealDate = new Date(deal.updatedAt || deal.createdAt || "")
-        return dealDate.getMonth() === (6 + index) % 12 // Jul=6, Aug=7, etc.
+        return !isNaN(dealDate.getTime()) && dealDate.getMonth() === monthIndex && dealDate.getFullYear() === year
       })
       const revenue = monthDeals.reduce((sum: number, deal: any) => {
         const value = deal.value || deal.dealValue || 0
