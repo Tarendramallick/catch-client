@@ -339,28 +339,23 @@ export default function TasksPage() {
 
   const TaskCard = ({ task }: { task: any }) => (
     <Card
-      className={`hover:shadow-md transition-shadow ${task.completed || task.status === "completed" ? "opacity-60 bg-muted/30" : ""}`}
+      className={`mb-3 hover:shadow-md transition-shadow ${task.completed || task.status === "completed" ? "opacity-75" : ""}`}
     >
-      <CardContent className="p-4 md:p-5">
-        {/* Header: Title, Priority, Status */}
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="flex items-start gap-3 flex-1 min-w-0">
-            <div className="mt-1 flex-shrink-0">{getTaskIcon(task.type)}</div>
-            <div className="min-w-0 flex-1">
-              <h4
-                className={`font-semibold text-sm md:text-base leading-snug ${
-                  task.completed || task.status === "completed" ? "line-through text-muted-foreground" : ""
-                }`}
-              >
-                {task.title}
-              </h4>
-            </div>
+      <CardContent className="p-3 md:p-4">
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            {getTaskIcon(task.type)}
+            <h4
+              className={`font-medium text-sm ${task.completed || task.status === "completed" ? "line-through" : ""} truncate`}
+            >
+              {task.title}
+            </h4>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <Badge className={getPriorityColor(task.priority)} variant="outline">
               {task.priority}
             </Badge>
-            <Button variant="ghost" size="sm" onClick={() => toggleTask(task.id)} className="h-6 w-6 p-0 flex-shrink-0">
+            <Button variant="ghost" size="sm" onClick={() => toggleTask(task.id)} className="h-6 w-6 p-0">
               {task.completed || task.status === "completed" ? (
                 <CheckCircle className="h-4 w-4 text-green-500" />
               ) : (
@@ -370,68 +365,32 @@ export default function TasksPage() {
           </div>
         </div>
 
-        {/* Description */}
-        {task.description && <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{task.description}</p>}
+        {task.description && <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{task.description}</p>}
 
-        {/* Metadata: Assignee, Due Date, Time */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 pb-3 border-t border-border/50">
-          {/* Assignee */}
-          <div className="pt-3 md:pt-2">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-1">Assigned To</p>
-            <div className="flex items-center gap-2">
-              <Avatar className="h-6 w-6 flex-shrink-0">
-                <AvatarImage src={task.avatar || "/placeholder.svg"} />
-                <AvatarFallback className="text-xs font-medium">
-                  {(task.assignee || "U")
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")}
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-sm font-medium truncate">{task.assignee || "Unassigned"}</span>
-            </div>
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <Avatar className="h-5 w-5 flex-shrink-0">
+              <AvatarImage src={task.avatar || "/placeholder.svg"} />
+              <AvatarFallback className="text-xs">
+                {(task.assignee || "Unknown")
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")}
+              </AvatarFallback>
+            </Avatar>
+            <span className="truncate">{task.assignee || "Unknown"}</span>
           </div>
-
-          {/* Due Date */}
-          <div className="pt-3 md:pt-2">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-1">Due Date</p>
-            <p className="text-sm font-medium">
-              {new Date(task.dueDate).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-              })}
-            </p>
-          </div>
-
-          {/* Due Time */}
-          <div className="pt-3 md:pt-2">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-1">Time</p>
-            <div className="flex items-center gap-1">
-              <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <span className="text-sm font-medium">{task.dueTime}</span>
-            </div>
-          </div>
-
-          {/* Client */}
-          <div className="pt-3 md:pt-2">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-1">Client</p>
-            <p className="text-sm font-medium truncate">{task.client || task.companyId || "Internal"}</p>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <Clock className="h-3 w-3" />
+            <span>{task.dueTime}</span>
           </div>
         </div>
 
-        {/* Task Type Badge */}
-        <div className="flex items-center justify-between">
-          <Badge variant="secondary" className="capitalize">
-            {task.type}
-          </Badge>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => deleteTask(task.id)}
-            className="text-destructive hover:text-destructive h-8 px-2"
-          >
-            Delete
-          </Button>
+        <div className="flex items-center justify-between mt-2 text-xs">
+          <span className="text-muted-foreground truncate flex-1">{task.client || task.companyId || "Internal"}</span>
+          <span className="text-muted-foreground flex-shrink-0 ml-2">
+            {new Date(task.dueDate).toLocaleDateString()}
+          </span>
         </div>
       </CardContent>
     </Card>
@@ -569,12 +528,12 @@ export default function TasksPage() {
             </div>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="space-y-3 max-h-96 overflow-y-auto">
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 max-h-96 overflow-y-auto">
               {taskColumns.completed.map((task: any) => (
                 <TaskCard key={task.id} task={task} />
               ))}
               {taskColumns.completed.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">No completed tasks yet</p>
+                <p className="text-sm text-muted-foreground text-center py-4 col-span-full">No completed tasks yet</p>
               )}
             </div>
           </CardContent>
