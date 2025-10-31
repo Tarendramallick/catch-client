@@ -18,15 +18,21 @@ const fetcher = async (url: string) => {
 }
 
 export default function Dashboard() {
-  const { data: deals = [] } = useSWR("/api/deals", fetcher)
-  const { data: tasks = [] } = useSWR("/api/tasks", fetcher)
-  const { data: contacts = [] } = useSWR("/api/contacts", fetcher)
-  const { data: users = [] } = useSWR("/api/users", fetcher)
-  const { data: companies = [] } = useSWR("/api/companies", fetcher)
+  const {
+    data: deals = [],
+    isLoading: dealsLoading,
+    isValidating: dealsValidating,
+  } = useSWR("/api/deals", fetcher, { revalidateOnFocus: true })
+  const { data: tasks = [] } = useSWR("/api/tasks", fetcher, { revalidateOnFocus: true })
+  const { data: contacts = [] } = useSWR("/api/contacts", fetcher, { revalidateOnFocus: true })
+  const { data: users = [] } = useSWR("/api/users", fetcher, { revalidateOnFocus: true })
+  const { data: companies = [] } = useSWR("/api/companies", fetcher, { revalidateOnFocus: true })
 
-  const activeDeals = deals.filter((deal: any) => !["closed-won", "closed-lost"].includes(deal.stage?.toLowerCase()))
-  const closedWonDeals = deals.filter((deal: any) => deal.stage?.toLowerCase() === "closed-won")
-  const closedLostDeals = deals.filter((deal: any) => deal.stage?.toLowerCase() === "closed-lost")
+  const activeDeals = deals.filter(
+    (deal: any) => deal && !["closed-won", "closed-lost"].includes((deal.stage || "").toLowerCase()),
+  )
+  const closedWonDeals = deals.filter((deal: any) => deal && (deal.stage || "").toLowerCase() === "closed-won")
+  const closedLostDeals = deals.filter((deal: any) => deal && (deal.stage || "").toLowerCase() === "closed-lost")
   const totalRevenue = closedWonDeals.reduce((sum: number, deal: any) => sum + (deal.value || 0), 0)
   const conversionRate = deals.length > 0 ? (closedWonDeals.length / deals.length) * 100 : 0
 
@@ -77,17 +83,21 @@ export default function Dashboard() {
 
   const teamPerformance = users
     .map((user: any) => {
-      const userDeals = deals.filter((deal: any) => deal.assigneeId === user._id || deal.assignee === user.name)
+      const userDeals = deals.filter(
+        (deal: any) => deal && (deal.assigneeId === user._id || deal.assignee === user.name),
+      )
       const userRevenue = userDeals
-        .filter((deal: any) => deal.stage?.toLowerCase() === "closed-won")
+        .filter((deal: any) => deal && (deal.stage || "").toLowerCase() === "closed-won")
         .reduce((sum: number, deal: any) => sum + (deal.value || 0), 0)
       const tasksForUser = taskCountsByUserId.get(user._id || user.id) || { assigned: 0, completed: 0 }
+      const tasksNeeded = Math.max(0, tasksForUser.assigned - tasksForUser.completed)
       return {
         name: user.name,
         deals: userDeals.length,
         revenue: userRevenue,
         tasksCompleted: tasksForUser.completed,
         tasksAssigned: tasksForUser.assigned,
+        tasksNeeded: tasksNeeded,
         target: 150000,
         avatar: user.avatar || "/placeholder-40x40.png",
       }
@@ -398,7 +408,9 @@ export default function Dashboard() {
                   <div className="space-y-1">
                     <Progress value={(member.revenue / member.target) * 100} className="h-2" />
                     <p className="text-xs text-right text-muted-foreground">
-                      {((member.revenue / member.target) * 100).toFixed(1)}% of target
+                      {member.tasksNeeded > 0
+                        ? `${member.tasksNeeded} task${member.tasksNeeded !== 1 ? "s" : ""} needed`
+                        : "All tasks completed"}
                     </p>
                   </div>
                 </div>
