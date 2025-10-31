@@ -26,12 +26,21 @@ const fetcher = async (url: string) => {
   return data.data || data
 }
 
+const isClosedWon = (stage: any): boolean => {
+  if (!stage) return false
+  const normalized = String(stage).toLowerCase().trim().replace(/\s+/g, "-")
+  return normalized === "closed-won" || normalized === "closed won" || normalized === "closedwon"
+}
+
 export default function AnalyticsPage() {
   const { data: deals = [] } = useSWR("/api/deals", fetcher)
   const { data: users = [] } = useSWR("/api/users", fetcher)
 
-  const closedWonDeals = deals.filter((deal: any) => deal.stage?.toLowerCase() === "closed-won")
-  const totalRevenue = closedWonDeals.reduce((sum: number, deal: any) => sum + (deal.value || 0), 0)
+  const closedWonDeals = deals.filter((deal: any) => isClosedWon(deal.stage))
+  const totalRevenue = closedWonDeals.reduce((sum: number, deal: any) => {
+    const value = deal.value || deal.dealValue || 0
+    return sum + (typeof value === "number" ? value : Number.parseFloat(value) || 0)
+  }, 0)
   const totalDeals = closedWonDeals.length
   const avgDealSize = totalDeals > 0 ? totalRevenue / totalDeals : 0
 
@@ -43,7 +52,10 @@ export default function AnalyticsPage() {
         const dealDate = new Date(deal.updatedAt || deal.createdAt || "")
         return dealDate.getMonth() === (6 + index) % 12 // Jul=6, Aug=7, etc.
       })
-      const revenue = monthDeals.reduce((sum: number, deal: any) => sum + (deal.value || 0), 0)
+      const revenue = monthDeals.reduce((sum: number, deal: any) => {
+        const value = deal.value || deal.dealValue || 0
+        return sum + (typeof value === "number" ? value : Number.parseFloat(value) || 0)
+      }, 0)
       return { month, revenue, deals: monthDeals.length }
     })
   })()
@@ -54,7 +66,10 @@ export default function AnalyticsPage() {
       const userDeals = closedWonDeals.filter(
         (deal: any) => deal.assigneeId === user._id || deal.assignee === user.name,
       )
-      const revenue = userDeals.reduce((sum: number, deal: any) => sum + (deal.value || 0), 0)
+      const revenue = userDeals.reduce((sum: number, deal: any) => {
+        const value = deal.value || deal.dealValue || 0
+        return sum + (typeof value === "number" ? value : Number.parseFloat(value) || 0)
+      }, 0)
       return {
         name: user.name,
         deals: userDeals.length,
@@ -75,12 +90,21 @@ export default function AnalyticsPage() {
 
     return stages
       .map(({ stage, color }) => {
-        const stageDeals = deals.filter(
-          (deal: any) =>
-            deal.stage?.toLowerCase() === stage.toLowerCase() ||
-            deal.stage?.toLowerCase() === stage.toLowerCase().replace(" ", "-"),
-        )
-        const value = stageDeals.reduce((sum: number, deal: any) => sum + (deal.value || 0), 0)
+        const stageDeals = deals.filter((deal: any) => {
+          const dealStage = String(deal.stage || "")
+            .toLowerCase()
+            .trim()
+          const checkStage = stage.toLowerCase().replace(/\s+/g, "-").trim()
+          return (
+            dealStage.includes(checkStage.replace(/-/g, " ")) ||
+            dealStage.includes(checkStage) ||
+            dealStage === checkStage.replace(/-/g, " ")
+          )
+        })
+        const value = stageDeals.reduce((sum: number, deal: any) => {
+          const dealValue = deal.value || deal.dealValue || 0
+          return sum + (typeof dealValue === "number" ? dealValue : Number.parseFloat(dealValue) || 0)
+        }, 0)
         return {
           stage,
           count: stageDeals.length,
@@ -95,10 +119,20 @@ export default function AnalyticsPage() {
   const conversionRates = (() => {
     const stages = ["Lead", "Qualified", "Proposal", "Negotiation"]
     return stages.map((stage, index) => {
-      const currentStage = deals.filter((deal: any) => deal.stage?.toLowerCase() === stage.toLowerCase()).length
+      const currentStage = deals.filter((deal: any) => {
+        const dealStage = String(deal.stage || "")
+          .toLowerCase()
+          .trim()
+        return dealStage.includes(stage.toLowerCase())
+      }).length
       const nextStage =
         index < stages.length - 1
-          ? deals.filter((deal: any) => deal.stage?.toLowerCase() === stages[index + 1].toLowerCase()).length
+          ? deals.filter((deal: any) => {
+              const dealStage = String(deal.stage || "")
+                .toLowerCase()
+                .trim()
+              return dealStage.includes(stages[index + 1].toLowerCase())
+            }).length
           : closedWonDeals.length
 
       const rate = currentStage > 0 ? Math.round((nextStage / currentStage) * 100) : 0
